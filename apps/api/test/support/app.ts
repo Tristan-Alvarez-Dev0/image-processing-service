@@ -4,12 +4,15 @@ import { loadConfig, type Config } from '../../src/config.js';
 /**
  * Tests talk to a fixture server on 127.0.0.1 with a random port, so by
  * default that one loopback address and any port are allowed. SSRF tests
- * override these to get production behaviour.
+ * override these to get production behaviour. Rate limiting is off by
+ * default so unrelated suites don't trip it.
  */
 const TEST_DEFAULTS = {
   NODE_ENV: 'test',
   ALLOW_PRIVATE_ADDRESSES: '127.0.0.1',
   ALLOWED_PORTS: '*',
+  // Suites fire many requests; rate-limit tests opt back in explicitly.
+  RATE_LIMIT_MAX: '0',
 };
 
 export function testConfig(overrides: Partial<NodeJS.ProcessEnv> = {}): Config {
