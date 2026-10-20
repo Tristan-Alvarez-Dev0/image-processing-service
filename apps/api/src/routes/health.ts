@@ -8,6 +8,8 @@ export const healthRoutes: FastifyPluginAsync<HealthRouteOptions> = async (app, 
   app.get(
     '/health',
     {
+      // Platform health checks poll this constantly; never rate-limit it.
+      config: { rateLimit: false },
       schema: {
         response: {
           200: {

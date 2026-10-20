@@ -9,6 +9,7 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),
 const MB = 1024 * 1024;
 
 const positiveInt = z.coerce.number().int().positive();
+const nonNegativeInt = z.coerce.number().int().min(0);
 
 const commaList = z
   .string()
@@ -67,6 +68,21 @@ const configSchema = z
     PROCESSING_TIMEOUT_MS: positiveInt.default(15_000),
     /** Images processed in parallel; extra requests wait their turn. */
     MAX_CONCURRENT_JOBS: positiveInt.default(availableParallelism()),
+
+    // --- Abuse protection ---
+    /** Requests per client IP per window; 0 disables rate limiting. */
+    RATE_LIMIT_MAX: nonNegativeInt.default(60),
+    RATE_LIMIT_WINDOW_MS: positiveInt.default(60_000),
+
+    // --- Caching ---
+    /** Processed images kept in memory; 0 disables. */
+    RESULT_CACHE_MAX_BYTES: nonNegativeInt.default(100 * MB),
+    RESULT_CACHE_TTL_SECONDS: positiveInt.default(3600),
+    /** Downloaded originals, so tweaking params doesn't re-download; 0 disables. */
+    SOURCE_CACHE_MAX_BYTES: nonNegativeInt.default(50 * MB),
+    SOURCE_CACHE_TTL_SECONDS: positiveInt.default(300),
+    /** Cache-Control max-age sent to browsers and CDNs. */
+    HTTP_CACHE_MAX_AGE_SECONDS: nonNegativeInt.default(86_400),
   })
   .refine((c) => c.NODE_ENV !== 'production' || c.ALLOW_PRIVATE_ADDRESSES.length === 0, {
     path: ['ALLOW_PRIVATE_ADDRESSES'],
