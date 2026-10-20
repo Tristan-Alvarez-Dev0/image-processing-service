@@ -11,6 +11,7 @@ import { genRequestId } from './observability/request-id.js';
 import { healthRoutes } from './routes/health.js';
 import { EXPOSED_HEADERS, type ProcessedImage } from './routes/image-response.js';
 import { docsRoutes } from './routes/docs.js';
+import { debugRoutes } from './routes/debug.js';
 import { metricsRoutes } from './routes/metrics.js';
 import { buildOpenApiDocument } from './openapi/spec.js';
 import { processRoutes } from './routes/process.js';
@@ -141,6 +142,7 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
 
   await app.register(healthRoutes, { version: config.APP_VERSION });
   await app.register(metricsRoutes, { registry: metrics.registry, token: config.METRICS_TOKEN });
+  if (config.DEBUG_CLIENT_IP) await app.register(debugRoutes);
   await app.register(docsRoutes, {
     document: buildOpenApiDocument({
       version: config.APP_VERSION,

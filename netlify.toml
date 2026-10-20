@@ -1,4 +1,4 @@
-# Static UI on Netlify. The API is deployed separately (Railway, see railway.json).
+# Static UI on Netlify. The API is deployed separately (Render, see render.yaml).
 # Set VITE_API_URL in Netlify's environment variables to the API's public URL.
 
 [build]

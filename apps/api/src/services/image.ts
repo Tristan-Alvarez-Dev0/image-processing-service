@@ -77,7 +77,9 @@ function encode(pipeline: Sharp, format: OutputFormat, quality: number): Sharp {
     case 'webp':
       return pipeline.webp({ quality });
     case 'avif':
-      return pipeline.avif({ quality });
+      // Effort 2 encodes ~6x faster than the default 4 for ~5% larger files;
+      // the default made AVIF unusable on small instances.
+      return pipeline.avif({ quality, effort: 2 });
     case 'png':
       // PNG is lossless; quality has no meaningful effect.
       return pipeline.png({ compressionLevel: 9 });

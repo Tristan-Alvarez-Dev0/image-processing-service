@@ -37,6 +37,11 @@ const configSchema = z
     APP_VERSION: z.string().default(pkg.version),
     // Only enable behind a trusted reverse proxy; otherwise clients can spoof
     // X-Forwarded-For and dodge per-IP rate limits.
+    /** Enables GET /debug/client-ip, to check TRUST_PROXY behind a new proxy. Keep off. */
+    DEBUG_CLIENT_IP: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     TRUST_PROXY: z
       .string()
       .default('false')

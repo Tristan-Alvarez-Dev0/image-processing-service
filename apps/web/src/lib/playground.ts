@@ -88,15 +88,15 @@ const num = (value: string) => (value.trim() === '' ? undefined : Number(value))
 function panel(mode: Mode, options: Options, run: number): PanelRequest {
   return mode === 'video'
     ? {
-      key: client.videoThumbnailUrl(options),
-      run,
-      load: (signal) => client.videoThumbnail(options, { signal }),
-    }
+        key: client.videoThumbnailUrl(options),
+        run,
+        load: (signal) => client.videoThumbnail(options, { signal }),
+      }
     : {
-      key: client.buildUrl(options),
-      run,
-      load: (signal) => client.process(options, { signal }),
-    };
+        key: client.buildUrl(options),
+        run,
+        load: (signal) => client.process(options, { signal }),
+      };
 }
 
 /** Default values are left out to keep URLs short. */

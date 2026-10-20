@@ -101,3 +101,27 @@ describe('rate limiting', () => {
     expect(responses[0]!.headers['x-ratelimit-limit']).toBeUndefined();
   });
 });
+
+describe('GET /debug/client-ip', () => {
+  it('does not exist unless DEBUG_CLIENT_IP=true', async () => {
+    app = await buildTestApp({}, { fetchSource });
+
+    expect((await app.inject({ method: 'GET', url: '/debug/client-ip' })).statusCode).toBe(404);
+  });
+
+  it('shows which address TRUST_PROXY picks as the client', async () => {
+    app = await buildTestApp({ DEBUG_CLIENT_IP: 'true', TRUST_PROXY: '1' }, { fetchSource });
+
+    const res = await hit({
+      url: '/debug/client-ip',
+      headers: { 'x-forwarded-for': '1.1.1.1, 198.51.100.7' },
+    });
+
+    expect(res.json()).toEqual({
+      ip: '198.51.100.7',
+      chain: ['203.0.113.10', '198.51.100.7'],
+      forwardedFor: '1.1.1.1, 198.51.100.7',
+    });
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+});

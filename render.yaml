@@ -1,0 +1,37 @@
+# Render Blueprint for the API. The web UI is deployed separately to Netlify.
+services:
+  - type: web
+    name: image-processing-api
+    runtime: docker
+    plan: free
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - apps/api/**
+        - package.json
+        - package-lock.json
+        - tsconfig.base.json
+        - Dockerfile
+        - .dockerignore
+        - render.yaml
+    envVars:
+      # Render's proxy appends to X-Forwarded-For; trust only that one hop.
+      - key: TRUST_PROXY
+        value: '1'
+      - key: METRICS_TOKEN
+        generateValue: true
+      # Sized for the free instance (512 MB RAM, a fraction of a CPU).
+      - key: MAX_CONCURRENT_JOBS
+        value: '1'
+      - key: RESULT_CACHE_MAX_BYTES
+        value: '52428800'
+      - key: SOURCE_CACHE_MAX_BYTES
+        value: '26214400'
+      - key: VIDEO_MAX_SOURCE_BYTES
+        value: '52428800'
+      - key: PROCESSING_TIMEOUT_MS
+        value: '30000'
