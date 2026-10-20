@@ -17,6 +17,7 @@ export interface VideoRouteOptions {
   resultCache: LoadingCache<ProcessedImage>;
   maxDimension: number;
   maxSourceBytes: number;
+  fetchTimeoutMs: number;
   imageLimits: ImageLimits;
   videoLimits: VideoLimits;
   httpMaxAgeSeconds: number;
@@ -44,7 +45,10 @@ export const videoRoutes: FastifyPluginAsync<VideoRouteOptions> = async (app, op
 
       const { value, hit } = await opts.resultCache.get(cacheKey('video', params), async () => {
         // Videos skip the source cache: they are large, and results are cached anyway.
-        const source = await opts.fetchSource(params.url, { maxBytes: opts.maxSourceBytes });
+        const source = await opts.fetchSource(params.url, {
+          maxBytes: opts.maxSourceBytes,
+          timeoutMs: opts.fetchTimeoutMs,
+        });
         return opts.limiter.run(async () => {
           const end = opts.metrics.processingDuration.startTimer({ kind: 'video' });
           let frame: ExtractedFrame;

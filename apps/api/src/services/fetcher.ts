@@ -29,6 +29,8 @@ export interface FetchOptions {
 export interface FetchCallOptions {
   /** Overrides the fetcher's default size limit (e.g. larger for videos). */
   maxBytes?: number;
+  /** Overrides the fetcher's default time budget (e.g. longer for videos). */
+  timeoutMs?: number;
 }
 
 export type SourceFetcher = (url: string, callOpts?: FetchCallOptions) => Promise<FetchedSource>;
@@ -65,7 +67,21 @@ function findCause<T>(err: unknown, pick: (e: unknown) => T | undefined): T | un
   return undefined;
 }
 
-function toAppError(err: unknown, timedOut: boolean, timeoutMs: number): AppError {
+/** How far a download got, so a timeout can say what happened. */
+interface Progress {
+  received: number;
+  /** From Content-Length, when the source sent one. */
+  expected: number | undefined;
+  /** True once response headers arrived and the body is being read. */
+  downloading: boolean;
+}
+
+function toAppError(
+  err: unknown,
+  timedOut: boolean,
+  timeoutMs: number,
+  progress: Progress,
+): AppError {
   if (err instanceof AppError) return err;
 
   const blocked = findCause(err, (e) => (e instanceof BlockedAddressError ? e : undefined));
@@ -77,6 +93,13 @@ function toAppError(err: unknown, timedOut: boolean, timeoutMs: number): AppErro
   }
 
   if (timedOut) {
+    if (progress.downloading) {
+      const of = progress.expected ? ` of ${formatBytes(progress.expected)}` : '';
+      return new AppError(
+        'UPSTREAM_TIMEOUT',
+        `The source started sending but did not finish within ${timeoutMs / 1000}s (received ${formatBytes(progress.received)}${of}); it is too slow or too large`,
+      );
+    }
     return new AppError(
       'UPSTREAM_TIMEOUT',
       `The source URL did not respond within ${timeoutMs / 1000}s`,
@@ -104,11 +127,12 @@ function discard(body: Body): void {
   body.destroy();
 }
 
-async function readLimited(body: Body, maxBytes: number) {
+async function readLimited(body: Body, maxBytes: number, progress: Progress) {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of body) {
     size += (chunk as Buffer).length;
+    progress.received = size;
     if (size > maxBytes) {
       discard(body);
       throw new AppError(
@@ -141,7 +165,9 @@ export function createFetcher(opts: FetchOptions): Fetcher {
 
   const fetchSource: SourceFetcher = async (rawUrl, callOpts) => {
     const maxBytes = callOpts?.maxBytes ?? opts.maxBytes;
-    const signal = AbortSignal.timeout(opts.timeoutMs);
+    const timeoutMs = callOpts?.timeoutMs ?? opts.timeoutMs;
+    const signal = AbortSignal.timeout(timeoutMs);
+    const progress: Progress = { received: 0, expected: undefined, downloading: false };
     let url = new URL(rawUrl);
 
     try {
@@ -190,14 +216,16 @@ export function createFetcher(opts: FetchOptions): Fetcher {
           );
         }
 
+        progress.downloading = true;
+        progress.expected = Number.isFinite(declared) ? declared : undefined;
         const contentType = res.headers['content-type'];
         return {
-          body: await readLimited(res.body, maxBytes),
+          body: await readLimited(res.body, maxBytes, progress),
           contentType: typeof contentType === 'string' ? contentType : undefined,
         };
       }
     } catch (err) {
-      throw toAppError(err, signal.aborted, opts.timeoutMs);
+      throw toAppError(err, signal.aborted, timeoutMs, progress);
     }
   };
 

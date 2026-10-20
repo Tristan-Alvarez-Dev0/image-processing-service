@@ -15,6 +15,8 @@ export interface Route {
   headers?: Record<string, string>;
   /** Send the body in two chunks without Content-Length. */
   chunked?: boolean;
+  /** Send headers and the first half at once, then the rest after this many ms. */
+  stallBodyMs?: number;
 }
 
 export interface FixtureServer {
@@ -48,7 +50,11 @@ export async function startFixtureServer(routes: Record<string, Route>): Promise
         ...(!route.chunked && { 'Content-Length': Buffer.byteLength(body) }),
         ...route.headers,
       });
-      if (route.chunked) {
+      if (route.stallBodyMs) {
+        const mid = Math.floor(body.length / 2);
+        res.write(body.slice(0, mid));
+        timers.add(setTimeout(() => res.end(body.slice(mid)), route.stallBodyMs));
+      } else if (route.chunked) {
         const mid = Math.floor(body.length / 2);
         res.write(body.slice(0, mid));
         res.end(body.slice(mid));

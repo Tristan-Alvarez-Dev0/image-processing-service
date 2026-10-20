@@ -6,7 +6,7 @@ import {
   formatBytes,
   prepareRequest,
   sizeChange,
-} from './lib.js';
+} from './playground.js';
 import { ImageApiError } from '@ips/sdk';
 
 const SRC = 'https://cdn.example.com/a.jpg';

@@ -1,5 +1,9 @@
+import { Check, Copy, ExternalLink, Terminal } from 'lucide-react';
 import { useState } from 'react';
-import { curlCommand } from '../lib.js';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { curlCommand } from '@/lib/playground';
 
 interface Props {
   /** Path + query of the request, e.g. `/process?url=…`. */
@@ -7,54 +11,68 @@ interface Props {
   negotiated: boolean;
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+function CopyButton({ text, label, icon }: { text: string; label: string; icon: React.ReactNode }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button
+    <Button
       type="button"
-      className="button"
+      variant="secondary"
+      size="sm"
       onClick={async () => {
         await navigator.clipboard.writeText(text);
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
     >
+      {copied ? <Check className="text-emerald-400" /> : icon}
       {copied ? 'Copied!' : label}
-    </button>
+    </Button>
   );
 }
 
 export function RequestBar({ path, negotiated }: Props) {
   if (!path) {
     return (
-      <div className="request request--empty">
-        The exact API request will appear here, ready to copy.
-      </div>
+      <Card className="border-dashed">
+        <CardContent className="text-sm text-muted-foreground">
+          The exact API request will appear here, ready to copy.
+        </CardContent>
+      </Card>
     );
   }
   const url = new URL(path, window.location.origin).href;
-  const curl = curlCommand(url, negotiated);
 
   return (
-    <div className="request">
-      <div className="request__line">
-        <span className="request__method">GET</span>
-        <code className="request__url" data-testid="request-url">
-          {url}
-        </code>
-      </div>
-      <div className="request__actions">
-        <CopyButton text={url} label="Copy URL" />
-        <CopyButton text={curl} label="Copy as curl" />
-        <a className="button button--ghost" href={url} target="_blank" rel="noreferrer">
-          Open
-        </a>
-      </div>
-      {negotiated && (
-        <p className="field__hint">
-          format=auto depends on the Accept header, so the curl command sends one.
-        </p>
-      )}
-    </div>
+    <Card>
+      <CardContent className="space-y-3">
+        <div className="flex items-start gap-3">
+          <Badge className="mt-0.5 bg-emerald-500/15 font-mono text-emerald-400">GET</Badge>
+          <code
+            data-testid="request-url"
+            className="min-w-0 flex-1 rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs leading-relaxed break-all"
+          >
+            {url}
+          </code>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <CopyButton text={url} label="Copy URL" icon={<Copy />} />
+          <CopyButton
+            text={curlCommand(url, negotiated)}
+            label="Copy as curl"
+            icon={<Terminal />}
+          />
+          <Button asChild variant="ghost" size="sm">
+            <a href={url} target="_blank" rel="noreferrer">
+              <ExternalLink /> Open
+            </a>
+          </Button>
+          {negotiated && (
+            <span className="text-xs text-muted-foreground">
+              format=auto depends on the Accept header, so the curl command sends one.
+            </span>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

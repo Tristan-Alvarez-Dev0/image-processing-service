@@ -40,6 +40,7 @@ describe('loadConfig', () => {
       MAX_OUTPUT_DIMENSION: 4000,
       MAX_INPUT_PIXELS: 50_000_000,
       PROCESSING_TIMEOUT_MS: 15_000,
+      VIDEO_FETCH_TIMEOUT_MS: 60_000,
     });
     expect(config.ALLOWED_PORTS).toEqual(new Set([80, 443]));
     expect(config.MAX_CONCURRENT_JOBS).toBeGreaterThan(0);

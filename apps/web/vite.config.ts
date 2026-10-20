@@ -1,15 +1,18 @@
 import { fileURLToPath } from 'node:url';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
 const API = process.env.API_URL ?? 'http://localhost:3000';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     // Use the SDK's source directly, so the UI never needs a separate SDK build step.
     alias: {
       '@ips/sdk': fileURLToPath(new URL('../../packages/sdk/src/index.ts', import.meta.url)),
+      // Matches the "@/*" path in tsconfig.json (used by the shadcn/ui components).
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {

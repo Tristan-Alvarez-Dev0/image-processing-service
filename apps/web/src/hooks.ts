@@ -1,15 +1,6 @@
 import type { ImageResult } from '@ips/sdk';
 import { useEffect, useEffectEvent, useState } from 'react';
-import type { PanelRequest } from './lib.js';
-
-export function useDebounced<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timer);
-  }, [value, delayMs]);
-  return debounced;
-}
+import type { PanelRequest } from '@/lib/playground';
 
 export interface Loaded {
   result: ImageResult;
@@ -27,34 +18,34 @@ export interface PanelState {
 }
 
 interface Settled {
-  key: string;
+  id: string;
   data?: Loaded;
   error?: unknown;
 }
 
 /**
- * Loads the image for `request` whenever its key (the exact URL) changes,
- * cancelling the previous request so stale responses never win.
+ * Loads the image for `request` whenever it changes (a new URL, or the same
+ * URL run again), cancelling the previous request so stale responses never win.
  */
 export function useImage(request: PanelRequest | undefined): PanelState {
   const [settled, setSettled] = useState<Settled>();
-  const key = request?.key;
+  const id = request ? `${request.run}:${request.key}` : undefined;
   const load = useEffectEvent((signal: AbortSignal) => request!.load(signal));
 
   useEffect(() => {
-    if (!key) return;
+    if (!id) return;
     const controller = new AbortController();
     load(controller.signal).then(
       (result) => {
         if (controller.signal.aborted) return;
-        setSettled({ key, data: { result, src: URL.createObjectURL(result.blob) } });
+        setSettled({ id, data: { result, src: URL.createObjectURL(result.blob) } });
       },
       (error: unknown) => {
-        if (!controller.signal.aborted) setSettled({ key, error });
+        if (!controller.signal.aborted) setSettled({ id, error });
       },
     );
     return () => controller.abort();
-  }, [key]);
+  }, [id]);
 
   // Free the previous blob once a new result has replaced it.
   useEffect(() => {
@@ -64,9 +55,9 @@ export function useImage(request: PanelRequest | undefined): PanelState {
     };
   }, [settled]);
 
-  const current = settled?.key === key;
+  const current = settled?.id === id;
   return {
-    loading: key !== undefined && !current,
+    loading: id !== undefined && !current,
     data: settled?.data,
     error: current ? settled?.error : undefined,
   };

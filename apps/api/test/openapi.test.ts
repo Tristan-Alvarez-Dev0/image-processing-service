@@ -112,6 +112,23 @@ describe('the spec matches the code (drift checks)', () => {
   });
 });
 
+describe('metrics auth in the spec', () => {
+  it('declares the bearer token so Swagger UI offers an Authorize button for /metrics', async () => {
+    const { doc } = await spec();
+    const full = doc as unknown as {
+      components: { securitySchemes: Record<string, { type: string; scheme: string }> };
+      paths: Record<string, { get: { security?: unknown[] } }>;
+    };
+
+    expect(full.components.securitySchemes.metricsToken).toMatchObject({
+      type: 'http',
+      scheme: 'bearer',
+    });
+    expect(full.paths['/metrics']!.get.security).toEqual([{ metricsToken: [] }, {}]);
+    expect(full.paths['/process']!.get.security).toBeUndefined();
+  });
+});
+
 describe('GET /docs', () => {
   it('serves the interactive docs', async () => {
     app = await buildTestApp();

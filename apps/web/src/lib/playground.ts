@@ -12,6 +12,9 @@ import {
 /** Same origin: the API serves this UI in production, Vite proxies it in development. */
 export const client = new ImageClient({
   baseUrl: '',
+  // Longer than the server's own limits (60 s to download a video, then
+  // processing), so the API's clear error arrives instead of a client timeout.
+  timeoutMs: 120_000,
   // Interactive use: a short retry is fine, but never keep the user waiting long.
   retry: { retries: 1, baseDelayMs: 300, maxDelayMs: 3_000 },
 });
@@ -66,8 +69,10 @@ export const TRANSFORM_DEFAULTS: Omit<FormState, 'mode' | 'url' | 'time'> = {
 type Options = ProcessOptions | VideoThumbnailOptions;
 
 export interface PanelRequest {
-  /** The exact URL requested; also identifies the request. */
+  /** The exact URL requested. */
   key: string;
+  /** Increments on every button press, so pressing again re-runs the same URL. */
+  run: number;
   load: (signal: AbortSignal) => Promise<ImageResult>;
 }
 
@@ -81,17 +86,22 @@ export interface PreparedRequest {
 
 const num = (value: string) => (value.trim() === '' ? undefined : Number(value));
 
-function panel(mode: Mode, options: Options): PanelRequest {
+function panel(mode: Mode, options: Options, run: number): PanelRequest {
   return mode === 'video'
     ? {
         key: client.videoThumbnailUrl(options),
+        run,
         load: (signal) => client.videoThumbnail(options, { signal }),
       }
-    : { key: client.buildUrl(options), load: (signal) => client.process(options, { signal }) };
+    : {
+        key: client.buildUrl(options),
+        run,
+        load: (signal) => client.process(options, { signal }),
+      };
 }
 
 /** Turns the form into API requests. Default values are left out to keep URLs short. */
-export function prepareRequest(form: FormState): PreparedRequest | undefined {
+export function prepareRequest(form: FormState, run = 0): PreparedRequest | undefined {
   const url = form.url.trim();
   if (!url) return undefined;
 
@@ -111,8 +121,8 @@ export function prepareRequest(form: FormState): PreparedRequest | undefined {
 
   return {
     mode: form.mode,
-    original: panel(form.mode, base),
-    processed: panel(form.mode, processed),
+    original: panel(form.mode, base, run),
+    processed: panel(form.mode, processed, run),
     negotiated: form.format === 'auto',
   };
 }

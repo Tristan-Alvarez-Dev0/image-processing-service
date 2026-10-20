@@ -77,6 +77,12 @@ const configSchema = z
     // --- Video thumbnails ---
     /** Videos are larger than images, so they get their own size limit. */
     VIDEO_MAX_SOURCE_BYTES: positiveInt.default(100 * MB),
+    /**
+     * Time budget to download a video. Videos are far larger than images, and
+     * CDN throughput varies a lot (we measured 0.8-5 MB/s for the same file),
+     * so 10 s is not enough for a typical 20-30 MB clip.
+     */
+    VIDEO_FETCH_TIMEOUT_MS: positiveInt.default(60_000),
     /** Bundled static ffmpeg by default; set to use a system binary instead. */
     FFMPEG_PATH: z.string().default(ffmpegStatic ?? 'ffmpeg'),
 

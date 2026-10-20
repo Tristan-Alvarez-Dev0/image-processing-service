@@ -133,9 +133,10 @@ describe('GET /video/thumbnail', () => {
   it('fetches with the larger video size limit', async () => {
     await thumb({ url: 'red-blue.mp4', time: 0.2 });
 
-    expect(upstream).toHaveBeenCalledWith('https://videos.test/red-blue.mp4', {
-      maxBytes: 100 * 1024 * 1024,
-    });
+    expect(upstream).toHaveBeenCalledWith(
+      'https://videos.test/red-blue.mp4',
+      expect.objectContaining({ maxBytes: 100 * 1024 * 1024 }),
+    );
   });
 });
 
@@ -288,5 +289,30 @@ describe('GET /video/thumbnail — rate limit', () => {
 
     expect(statuses).toEqual([200, 200, 429]);
     expect(image.statusCode).toBe(200);
+  });
+});
+
+describe('GET /video/thumbnail — download time budget', () => {
+  it('gives videos their own, longer fetch timeout', async () => {
+    upstream.mockClear();
+    const res = await thumb({ url: 'red-blue.mp4', time: 0.9 });
+
+    expect(res.statusCode).toBe(200);
+    expect(upstream).toHaveBeenCalledWith('https://videos.test/red-blue.mp4', {
+      maxBytes: 100 * 1024 * 1024,
+      timeoutMs: 60_000,
+    });
+  });
+
+  it('is configurable via VIDEO_FETCH_TIMEOUT_MS', async () => {
+    const custom = await buildTestApp(
+      { VIDEO_FETCH_TIMEOUT_MS: '90000' },
+      { fetchSource: upstream },
+    );
+    upstream.mockClear();
+    await thumb({ url: 'red-blue.mp4', time: 0.8 }, { app: custom });
+    await custom.close();
+
+    expect(upstream.mock.calls[0]![1]).toMatchObject({ timeoutMs: 90_000 });
   });
 });

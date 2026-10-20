@@ -151,6 +151,7 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
       videoMaxSourceBytes: config.VIDEO_MAX_SOURCE_BYTES,
       maxRedirects: config.MAX_REDIRECTS,
       fetchTimeoutMs: config.FETCH_TIMEOUT_MS,
+      videoFetchTimeoutMs: config.VIDEO_FETCH_TIMEOUT_MS,
       processingTimeoutMs: config.PROCESSING_TIMEOUT_MS,
       rateLimitMax: config.RATE_LIMIT_MAX,
       videoRateLimitMax: config.VIDEO_RATE_LIMIT_MAX,
@@ -173,6 +174,7 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
     resultCache,
     maxDimension: config.MAX_OUTPUT_DIMENSION,
     maxSourceBytes: config.VIDEO_MAX_SOURCE_BYTES,
+    fetchTimeoutMs: config.VIDEO_FETCH_TIMEOUT_MS,
     imageLimits,
     videoLimits: {
       ffmpegPath: config.FFMPEG_PATH,

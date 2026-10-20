@@ -16,6 +16,7 @@ export interface DocumentedLimits {
   videoMaxSourceBytes: number;
   maxRedirects: number;
   fetchTimeoutMs: number;
+  videoFetchTimeoutMs: number;
   processingTimeoutMs: number;
   rateLimitMax: number;
   videoRateLimitMax: number;
@@ -241,7 +242,7 @@ and the offending \`param\` when there is one:
 | Output width/height | ${l.maxDimension} px |
 | Decoded pixels (input and output, all frames) | ${mp(l.maxInputPixels)} |
 | Source size | ${mb(l.maxSourceBytes)} (videos: ${mb(l.videoMaxSourceBytes)}) |
-| Fetch time (including redirects) | ${l.fetchTimeoutMs / 1000} s |
+| Fetch time (including redirects) | ${l.fetchTimeoutMs / 1000} s (videos: ${l.videoFetchTimeoutMs / 1000} s) |
 | Redirects | ${l.maxRedirects} |
 | Processing time | ${l.processingTimeoutMs / 1000} s |
 | Rate limit per IP | ${l.rateLimitMax} requests / ${l.rateLimitWindowMs / 1000} s (video: ${l.videoRateLimitMax}) |
@@ -363,7 +364,8 @@ export function buildOpenApiDocument(l: DocumentedLimits) {
           operationId: 'metrics',
           summary: 'Prometheus metrics',
           description:
-            'Request counts and latency, cache hits, errors by code, fetch and processing times. Requires `Authorization: Bearer <token>` when the server sets `METRICS_TOKEN`.',
+            'Request counts and latency, cache hits, errors by code, fetch and processing times, in Prometheus text format. Requires `Authorization: Bearer <token>` when the server sets `METRICS_TOKEN` (use the Authorize button); otherwise it is public.',
+          security: [{ metricsToken: [] }, {}],
           responses: {
             '200': {
               description: 'Prometheus text format.',
@@ -375,6 +377,13 @@ export function buildOpenApiDocument(l: DocumentedLimits) {
       },
     },
     components: {
+      securitySchemes: {
+        metricsToken: {
+          type: 'http',
+          scheme: 'bearer',
+          description: 'The value of METRICS_TOKEN, if the server sets one. Only used by /metrics.',
+        },
+      },
       schemas: {
         Error: {
           type: 'object',

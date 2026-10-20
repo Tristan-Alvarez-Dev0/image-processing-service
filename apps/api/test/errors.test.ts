@@ -22,6 +22,7 @@ beforeAll(async () => {
     '/forbidden.jpg': { status: 403 },
     '/broken.jpg': { status: 500 },
     '/slow.jpg': { contentType: 'image/jpeg', body: f.jpeg, delayMs: 2_000 },
+    '/stalls.jpg': { contentType: 'image/jpeg', body: f.jpeg, stallBodyMs: 2_000 },
   });
 
   // Grab a free port, then close it so connections are refused.
@@ -226,6 +227,14 @@ describe('error contract — upstream failures', () => {
     const err = expectError(await processUrl({ url: '/slow.jpg' }), 504, 'UPSTREAM_TIMEOUT');
 
     expect(err.message).toBe('The source URL did not respond within 0.5s');
+  });
+
+  it('UPSTREAM_TIMEOUT that says how far the download got when the body is too slow', async () => {
+    const err = expectError(await processUrl({ url: '/stalls.jpg' }), 504, 'UPSTREAM_TIMEOUT');
+
+    expect(err.message).toMatch(
+      /^The source started sending but did not finish within 0\.5s \(received \d+ KB of \d+ KB\); it is too slow or too large$/,
+    );
   });
 });
 
