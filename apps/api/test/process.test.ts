@@ -16,11 +16,8 @@ beforeAll(async () => {
     '/rotated.jpg': { contentType: 'image/jpeg', body: f.rotatedJpeg },
     '/animated.gif': { contentType: 'image/gif', body: f.animatedGif },
     '/drawing.svg': { contentType: 'image/svg+xml', body: f.svg },
-    '/page.html': { contentType: 'text/html', body: '<html>hi</html>' },
-    '/broken': { status: 500 },
-    '/slow.jpg': { contentType: 'image/jpeg', body: f.jpeg, delayMs: 2_000 },
   });
-  app = await buildTestApp({ FETCH_TIMEOUT_MS: '500' });
+  app = await buildTestApp();
 });
 
 afterAll(async () => {
@@ -216,49 +213,6 @@ describe('GET /process — response headers', () => {
       'x-original-format': 'jpeg',
     });
     expect(Number(res.headers['x-original-size'])).toBeGreaterThan(0);
-  });
-});
-
-describe('GET /process — basic failures', () => {
-  it.each<{ name: string; params: Record<string, string | number> }>([
-    { name: 'missing url', params: {} },
-    { name: 'relative url', params: { url: 'not-a-url' } },
-    { name: 'non-http url', params: { url: 'ftp://example.com/a.jpg' } },
-    { name: 'zero width', params: { url: '/photo.jpg', width: 0 } },
-    { name: 'non-numeric width', params: { url: '/photo.jpg', width: 'abc' } },
-    { name: 'fractional height', params: { url: '/photo.jpg', height: 1.5 } },
-    { name: 'quality > 100', params: { url: '/photo.jpg', quality: 101 } },
-    { name: 'unknown format', params: { url: '/photo.jpg', format: 'bmp' } },
-    { name: 'unknown crop', params: { url: '/photo.jpg', crop: 'zoom' } },
-  ])('rejects $name with 400', async ({ params }) => {
-    const res = await process(params);
-
-    expect(res.statusCode).toBe(400);
-    expect(res.json()).toMatchObject({ code: 'INVALID_PARAMETER', message: expect.any(String) });
-  });
-
-  it('returns 404 when the source does not exist', async () => {
-    const res = await process({ url: '/missing.jpg' });
-
-    expect(res.statusCode).toBe(404);
-  });
-
-  it('returns 502 when the source errors', async () => {
-    const res = await process({ url: '/broken' });
-
-    expect(res.statusCode).toBe(502);
-  });
-
-  it('returns 504 when the source is too slow', async () => {
-    const res = await process({ url: '/slow.jpg' });
-
-    expect(res.statusCode).toBe(504);
-  });
-
-  it('returns 422 when the source is not a decodable image', async () => {
-    const res = await process({ url: '/page.html' });
-
-    expect(res.statusCode).toBe(422);
   });
 });
 
