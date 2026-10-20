@@ -38,9 +38,14 @@ const configSchema = z
     // Only enable behind a trusted reverse proxy; otherwise clients can spoof
     // X-Forwarded-For and dodge per-IP rate limits.
     TRUST_PROXY: z
-      .enum(['true', 'false'])
+      .string()
       .default('false')
-      .transform((v) => v === 'true'),
+      .transform((v, ctx) => {
+        if (v === 'true' || v === 'false') return v === 'true';
+        if (/^\d+$/.test(v)) return Number(v);
+        ctx.addIssue({ code: 'custom', message: 'must be true, false or a number of proxy hops' });
+        return z.NEVER;
+      }),
 
     /** Total time budget for fetching the source, across all redirects. */
     FETCH_TIMEOUT_MS: positiveInt.default(10_000),

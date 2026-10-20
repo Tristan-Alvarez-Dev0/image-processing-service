@@ -8,10 +8,12 @@ import {
   type ProcessOptions,
   type VideoThumbnailOptions,
 } from '@ips/sdk';
+import { resolveApiUrl } from './api-url';
 
-/** Same origin: the API serves this UI in production, Vite proxies it in development. */
+export const API_URL = resolveApiUrl(import.meta.env.VITE_API_URL);
+
 export const client = new ImageClient({
-  baseUrl: '',
+  baseUrl: API_URL,
   // Longer than the server's limits, so its clear error arrives before a client timeout.
   timeoutMs: 120_000,
   retry: { retries: 1, baseDelayMs: 300, maxDelayMs: 3_000 },
@@ -86,15 +88,15 @@ const num = (value: string) => (value.trim() === '' ? undefined : Number(value))
 function panel(mode: Mode, options: Options, run: number): PanelRequest {
   return mode === 'video'
     ? {
-        key: client.videoThumbnailUrl(options),
-        run,
-        load: (signal) => client.videoThumbnail(options, { signal }),
-      }
+      key: client.videoThumbnailUrl(options),
+      run,
+      load: (signal) => client.videoThumbnail(options, { signal }),
+    }
     : {
-        key: client.buildUrl(options),
-        run,
-        load: (signal) => client.process(options, { signal }),
-      };
+      key: client.buildUrl(options),
+      run,
+      load: (signal) => client.process(options, { signal }),
+    };
 }
 
 /** Default values are left out to keep URLs short. */

@@ -1,0 +1,16 @@
+**/node_modules
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+.git
+.env
+.env.*
+!.env.example
+PLAN.md
+apps/api/test
+# Only the package.json of the other workspaces is needed (for npm ci).
+apps/web/*
+!apps/web/package.json
+packages/sdk/*
+!packages/sdk/package.json

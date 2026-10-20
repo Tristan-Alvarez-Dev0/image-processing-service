@@ -47,11 +47,15 @@ function loggerOptions(config: Config, stream?: Writable): FastifyServerOptions[
   return { level: config.LOG_LEVEL };
 }
 
+/** A hop count trusts the first N proxies, counting back from the connection. */
+const trustProxyOption = (trust: boolean | number) =>
+  typeof trust === 'number' ? (_address: string, hop: number) => hop < trust : trust;
+
 /** Builds the app without listening, so tests can use `app.inject()`. */
 export async function buildApp(config: Config, deps: AppDeps = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: loggerOptions(config, deps.logStream),
-    trustProxy: config.TRUST_PROXY,
+    trustProxy: trustProxyOption(config.TRUST_PROXY),
     genReqId: genRequestId,
     logController: new LogController({
       requestIdLogLabel: 'requestId',
@@ -187,7 +191,8 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
   if (webBuildExists(config.WEB_ROOT)) {
     await app.register(webRoutes, { root: config.WEB_ROOT });
   } else {
-    app.log.info({ root: config.WEB_ROOT }, 'web UI not built; serving the API only');
+    // API-only deployment (the UI lives on Netlify): send visitors to the docs.
+    app.get('/', { config: { rateLimit: false } }, (_request, reply) => reply.redirect('/docs'));
   }
 
   return app;

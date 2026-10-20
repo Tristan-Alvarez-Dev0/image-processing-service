@@ -23,6 +23,12 @@ describe('loadConfig', () => {
     expect(config.NODE_ENV).toBe('production');
   });
 
+  it('accepts TRUST_PROXY as true, false or a hop count', () => {
+    expect(loadConfig({ TRUST_PROXY: 'true' }).TRUST_PROXY).toBe(true);
+    expect(loadConfig({ TRUST_PROXY: 'false' }).TRUST_PROXY).toBe(false);
+    expect(loadConfig({ TRUST_PROXY: '1' }).TRUST_PROXY).toBe(1);
+  });
+
   it('throws a readable error listing every invalid variable', () => {
     expect(() => loadConfig({ PORT: 'abc', LOG_LEVEL: 'loud', TRUST_PROXY: 'yes' })).toThrow(
       /Invalid environment configuration:[\s\S]*PORT[\s\S]*LOG_LEVEL[\s\S]*TRUST_PROXY/,

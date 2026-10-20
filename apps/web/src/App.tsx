@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { useImage } from '@/hooks';
 import {
+  API_URL,
   client,
   DEFAULT_FORM,
   describeError,
@@ -87,12 +88,12 @@ export function App() {
             </Badge>
           )}
           <Button asChild variant="ghost" size="sm">
-            <a href="/docs" target="_blank" rel="noreferrer">
+            <a href={`${API_URL}/docs`} target="_blank" rel="noreferrer">
               <BookOpen /> API docs
             </a>
           </Button>
           <Button asChild variant="ghost" size="sm">
-            <a href="/openapi.json" target="_blank" rel="noreferrer">
+            <a href={`${API_URL}/openapi.json`} target="_blank" rel="noreferrer">
               <FileJson /> OpenAPI
             </a>
           </Button>

@@ -72,6 +72,16 @@ describe('rate limiting', () => {
     expect(otherClient.statusCode).toBe(200);
   });
 
+  it('with a hop count, trusts only the address our proxy appended', async () => {
+    app = await buildTestApp({ RATE_LIMIT_MAX: '1', TRUST_PROXY: '1' }, { fetchSource });
+    const viaProxy = (spoofed: string, real: string) =>
+      hit({ headers: { 'x-forwarded-for': `${spoofed}, ${real}` } });
+
+    expect((await viaProxy('1.1.1.1', '198.51.100.7')).statusCode).toBe(200);
+    expect((await viaProxy('2.2.2.2', '198.51.100.7')).statusCode).toBe(429);
+    expect((await viaProxy('2.2.2.2', '198.51.100.8')).statusCode).toBe(200);
+  });
+
   it('never limits /health', async () => {
     app = await buildTestApp({ RATE_LIMIT_MAX: '1' }, { fetchSource });
     await hit();

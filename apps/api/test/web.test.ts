@@ -70,12 +70,13 @@ describe('web UI', () => {
     expect(api).toEqual([400, 429]);
   });
 
-  it('runs as an API only when the UI has not been built', async () => {
+  it('runs as an API only when the UI has not been built, sending / to the docs', async () => {
     app = await buildTestApp({ WEB_ROOT: join(root, 'missing') });
 
     const res = await app.inject({ method: 'GET', url: '/' });
 
-    expect(res.statusCode).toBe(404);
+    expect(res.statusCode).toBe(302);
+    expect(res.headers.location).toBe('/docs');
     expect((await app.inject({ method: 'GET', url: '/health' })).statusCode).toBe(200);
   });
 });

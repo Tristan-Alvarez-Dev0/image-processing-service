@@ -9,28 +9,21 @@ import type {
 import { buildQuery, joinUrl } from './url.js';
 
 export interface RetryOptions {
-  /** Extra attempts after the first. Default 2. */
   retries?: number;
-  /** First backoff delay; doubles each attempt, with jitter. Default 300 ms. */
   baseDelayMs?: number;
-  /** Never wait longer than this; a longer Retry-After fails immediately. Default 10 s. */
   maxDelayMs?: number;
 }
 
 export interface ClientOptions {
-  /** Where the API lives, e.g. `https://images.example.com`. Use `''` for the same origin. */
   baseUrl: string;
-  /** Per-attempt timeout. Default 30 s. */
   timeoutMs?: number;
   retry?: RetryOptions | false;
-  /** Defaults to the global fetch. */
   fetch?: typeof fetch;
   headers?: Record<string, string>;
 }
 
 export interface RequestOptions {
   signal?: AbortSignal;
-  /** Only matters for `format: 'auto'`. Defaults to advertising AVIF and WebP. */
   accept?: string;
 }
 
@@ -55,7 +48,6 @@ const intHeader = (headers: Headers, name: string) => {
   return value === null || value === '' ? undefined : Number(value);
 };
 
-/** Client for the Image Processing Service. See the package README for examples. */
 export class ImageClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
@@ -75,22 +67,16 @@ export class ImageClient {
     this.headers = options.headers ?? {};
   }
 
-  /** No network; ideal for `<img src>`. */
   buildUrl(options: ProcessOptions): string {
     return `${joinUrl(this.baseUrl, '/process')}?${buildQuery(options)}`;
   }
-
-  /** No network. */
   videoThumbnailUrl(options: VideoThumbnailOptions): string {
     return `${joinUrl(this.baseUrl, '/video/thumbnail')}?${buildQuery(options)}`;
   }
 
-  /** Throws ImageApiError on failure. */
   process(options: ProcessOptions, request: RequestOptions = {}): Promise<ImageResult> {
     return this.fetchImage(this.buildUrl(options), options.format === 'auto', request);
   }
-
-  /** Throws ImageApiError on failure. */
   videoThumbnail(
     options: VideoThumbnailOptions,
     request: RequestOptions = {},
@@ -151,7 +137,6 @@ export class ImageClient {
         }
         const backoff = this.retry.baseDelayMs * 2 ** attempt * (0.5 + Math.random() / 2);
         const delay = err.retryAfter !== undefined ? err.retryAfter * 1000 : backoff;
-        // Don't block the caller for longer than they agreed to wait.
         if (delay > this.retry.maxDelayMs) throw err;
         await sleep(delay, signal);
       }
@@ -174,7 +159,6 @@ export class ImageClient {
         signal: combined,
       });
     } catch (err) {
-      // The caller's own abort is not an API error: rethrow it untouched.
       if (signal?.aborted) throw signal.reason;
       if (timeout.aborted) {
         throw new ImageApiError({

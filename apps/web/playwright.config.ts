@@ -14,7 +14,6 @@ export default defineConfig({
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    // The real API serving the built UI. Fixtures live on 127.0.0.1, allowed only outside production.
     command: 'npm run build && tsx ../api/src/server.ts',
     url: `http://127.0.0.1:${PORT}/health`,
     reuseExistingServer: !process.env.CI,

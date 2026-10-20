@@ -17,7 +17,6 @@ export const API_ERROR_CODES = [
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
-/** Raised by the SDK itself: no response, a timeout, or a non-API error body (e.g. from a proxy). */
 export const CLIENT_ERROR_CODES = ['NETWORK_ERROR', 'TIMEOUT', 'INVALID_RESPONSE'] as const;
 export type ClientErrorCode = (typeof CLIENT_ERROR_CODES)[number];
 
@@ -28,16 +27,13 @@ export interface ErrorDetail {
   message: string;
 }
 
-/** Every failure from the SDK is an ImageApiError, so one `catch` handles them all. */
 export class ImageApiError extends Error {
   override readonly name = 'ImageApiError';
   readonly code: ErrorCode;
-  /** HTTP status; 0 when there was no response. */
   readonly status: number;
   readonly param: string | undefined;
   readonly details: ErrorDetail[] | undefined;
   readonly requestId: string | undefined;
-  /** Seconds the server asked us to wait (429 responses). */
   readonly retryAfter: number | undefined;
 
   constructor(init: {
@@ -59,7 +55,6 @@ export class ImageApiError extends Error {
     this.retryAfter = init.retryAfter;
   }
 
-  /** True for failures that may succeed if tried again later. */
   get retryable(): boolean {
     return (
       this.code === 'NETWORK_ERROR' ||
@@ -72,7 +67,6 @@ export class ImageApiError extends Error {
   }
 }
 
-/** Type guard that also works across bundle/realm boundaries. */
 export function isImageApiError(err: unknown): err is ImageApiError {
   return (
     err instanceof ImageApiError ||
