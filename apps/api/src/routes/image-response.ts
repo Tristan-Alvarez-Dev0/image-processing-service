@@ -1,4 +1,23 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+
+/** Response headers browsers on other origins may read (CORS), for SDKs and UIs. */
+export const EXPOSED_HEADERS = [
+  'Content-Length',
+  'ETag',
+  'Retry-After',
+  'X-Cache',
+  'X-Request-Id',
+  'X-Output-Width',
+  'X-Output-Height',
+  'X-Original-Width',
+  'X-Original-Height',
+  'X-Original-Format',
+  'X-Original-Size',
+  'X-Original-Duration',
+  'X-RateLimit-Limit',
+  'X-RateLimit-Remaining',
+  'X-RateLimit-Reset',
+];
 import { ifNoneMatchHits } from '../services/http-cache.js';
 import type { TransformResult } from '../services/image.js';
 
@@ -37,6 +56,8 @@ export function sendImage(
     .header('Content-Type', `image/${result.output.format}`)
     .header('Content-Length', result.data.length)
     .header('Content-Disposition', `inline; filename="image.${result.output.format}"`)
+    .header('X-Output-Width', result.output.width)
+    .header('X-Output-Height', result.output.height)
     .header('X-Original-Width', result.original.width)
     .header('X-Original-Height', result.original.height)
     .header('X-Original-Format', result.original.format)

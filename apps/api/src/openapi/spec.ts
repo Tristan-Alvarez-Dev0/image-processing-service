@@ -133,6 +133,10 @@ const header = (description: string, schema: Schema = { type: 'string' }) => ({
 });
 
 const imageResponseHeaders = {
+  'X-Output-Width': header('Width of the returned image.', { type: 'integer' }),
+  'X-Output-Height': header('Height of the returned image (one frame, for animations).', {
+    type: 'integer',
+  }),
   'X-Original-Width': header('Width of the source (after EXIF orientation).', { type: 'integer' }),
   'X-Original-Height': header('Height of the source.', { type: 'integer' }),
   'X-Original-Format': header('Format detected from the source bytes, e.g. `jpeg` or `mp4`.'),

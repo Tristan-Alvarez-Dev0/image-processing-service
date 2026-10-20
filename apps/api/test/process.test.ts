@@ -225,3 +225,46 @@ describe('GET /process — upstream request', () => {
     expect(headers?.['accept']).toMatch(/^image\/\*/);
   });
 });
+
+describe('GET /process — output size and CORS', () => {
+  it('reports the output dimensions', async () => {
+    const res = await process({ url: '/photo.jpg', width: 300, height: 120, crop: 'fit' });
+
+    expect(res.headers['x-output-width']).toBe('160');
+    expect(res.headers['x-output-height']).toBe('120');
+  });
+
+  it('reports one frame for animations', async () => {
+    const res = await process({ url: '/animated.gif', width: 50 });
+
+    expect([res.headers['x-output-width'], res.headers['x-output-height']]).toEqual(['50', '40']);
+  });
+
+  it('lets browsers on any origin call it and read the metadata headers', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/process?${toQuery({ url: '/photo.jpg', width: 10 })}`,
+      headers: { origin: 'https://some-other-site.example' },
+    });
+
+    expect(res.headers['access-control-allow-origin']).toBe('*');
+    expect(String(res.headers['access-control-expose-headers'])).toMatch(
+      /X-Output-Width.*X-Original-Format.*X-RateLimit-Remaining/,
+    );
+  });
+
+  it('answers CORS preflight requests', async () => {
+    const res = await app.inject({
+      method: 'OPTIONS',
+      url: '/process',
+      headers: {
+        origin: 'https://some-other-site.example',
+        'access-control-request-method': 'GET',
+        'access-control-request-headers': 'x-request-id',
+      },
+    });
+
+    expect(res.statusCode).toBe(204);
+    expect(res.headers['access-control-allow-methods']).toBe('GET, HEAD');
+  });
+});

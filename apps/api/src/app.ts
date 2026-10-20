@@ -1,4 +1,5 @@
 import type { Writable } from 'node:stream';
+import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Config } from './config.js';
@@ -8,7 +9,7 @@ import { createMetrics } from './observability/metrics.js';
 import { registerRequestHooks } from './observability/request-hooks.js';
 import { genRequestId } from './observability/request-id.js';
 import { healthRoutes } from './routes/health.js';
-import type { ProcessedImage } from './routes/image-response.js';
+import { EXPOSED_HEADERS, type ProcessedImage } from './routes/image-response.js';
 import { docsRoutes } from './routes/docs.js';
 import { metricsRoutes } from './routes/metrics.js';
 import { buildOpenApiDocument } from './openapi/spec.js';
@@ -61,6 +62,14 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
   const metrics = createMetrics();
   registerErrorHandling(app);
   registerRequestHooks(app, metrics);
+
+  // A public, cookie-less API: any site may call it and read its metadata headers.
+  await app.register(cors, {
+    origin: '*',
+    methods: ['GET', 'HEAD'],
+    exposedHeaders: EXPOSED_HEADERS,
+    maxAge: 86_400,
+  });
 
   if (config.RATE_LIMIT_MAX > 0) {
     await app.register(rateLimit, {
