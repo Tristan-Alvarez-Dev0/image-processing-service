@@ -9,7 +9,9 @@ import { registerRequestHooks } from './observability/request-hooks.js';
 import { genRequestId } from './observability/request-id.js';
 import { healthRoutes } from './routes/health.js';
 import type { ProcessedImage } from './routes/image-response.js';
+import { docsRoutes } from './routes/docs.js';
 import { metricsRoutes } from './routes/metrics.js';
+import { buildOpenApiDocument } from './openapi/spec.js';
 import { processRoutes } from './routes/process.js';
 import { videoRoutes } from './routes/video.js';
 import { AddressPolicy } from './security/address-policy.js';
@@ -64,6 +66,8 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
     await app.register(rateLimit, {
       max: config.RATE_LIMIT_MAX,
       timeWindow: config.RATE_LIMIT_WINDOW_MS,
+      // The docs UI loads several static assets per page view; they cost nothing to serve.
+      allowList: (request) => request.url.startsWith('/docs'),
       errorResponseBuilder: (_request, ctx) =>
         new AppError(
           'RATE_LIMITED',
@@ -123,6 +127,22 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
 
   await app.register(healthRoutes, { version: config.APP_VERSION });
   await app.register(metricsRoutes, { registry: metrics.registry, token: config.METRICS_TOKEN });
+  await app.register(docsRoutes, {
+    document: buildOpenApiDocument({
+      version: config.APP_VERSION,
+      maxDimension: config.MAX_OUTPUT_DIMENSION,
+      maxInputPixels: config.MAX_INPUT_PIXELS,
+      maxSourceBytes: config.MAX_SOURCE_BYTES,
+      videoMaxSourceBytes: config.VIDEO_MAX_SOURCE_BYTES,
+      maxRedirects: config.MAX_REDIRECTS,
+      fetchTimeoutMs: config.FETCH_TIMEOUT_MS,
+      processingTimeoutMs: config.PROCESSING_TIMEOUT_MS,
+      rateLimitMax: config.RATE_LIMIT_MAX,
+      videoRateLimitMax: config.VIDEO_RATE_LIMIT_MAX,
+      rateLimitWindowMs: config.RATE_LIMIT_WINDOW_MS,
+      httpMaxAgeSeconds: config.HTTP_CACHE_MAX_AGE_SECONDS,
+    }),
+  });
   await app.register(processRoutes, {
     fetchSource,
     limiter,

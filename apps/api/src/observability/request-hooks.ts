@@ -9,8 +9,9 @@ declare module 'fastify' {
   }
 }
 
-/** Routes polled by infrastructure; logged at debug level to keep logs readable. */
-const QUIET_ROUTES = new Set(['/health', '/metrics']);
+/** Infrastructure polling and docs assets; logged at debug level to keep logs readable. */
+const isQuiet = (route: string) =>
+  route === '/health' || route === '/metrics' || route.startsWith('/docs');
 
 /**
  * Only the host of the source is logged: full source URLs often carry signed
@@ -47,7 +48,7 @@ export function registerRequestHooks(app: FastifyInstance, metrics: Metrics) {
     metrics.httpDuration.observe({ route, method: request.method }, reply.elapsedTime / 1000);
     if (request.errorCode) metrics.errors.inc({ code: request.errorCode });
 
-    const level = status >= 500 ? 'error' : QUIET_ROUTES.has(route) ? 'debug' : 'info';
+    const level = status >= 500 ? 'error' : isQuiet(route) ? 'debug' : 'info';
     request.log[level](
       {
         method: request.method,
