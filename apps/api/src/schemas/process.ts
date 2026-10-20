@@ -55,8 +55,8 @@ const angle = (name: string) => {
 };
 
 /** A plain decimal such as "2" or "2.5" (no exponents or hex). */
-const decimal = (name: string, min: number, max: number) => {
-  const message = `${name} must be a number from ${min} to ${max}`;
+const decimal = (name: string, min: number, max: number, unit?: string) => {
+  const message = `${name} must be a number${unit ? ` of ${unit}` : ''} from ${min} to ${max}`;
   return z
     .string({ error: message })
     .regex(/^\d+(\.\d+)?$/, { error: message })
@@ -92,25 +92,40 @@ export const sourceUrl = () =>
       }),
     );
 
-export const createProcessQuerySchema = ({ maxDimension }: ProcessLimits) =>
+/** The transformation parameters shared by /process and /video/thumbnail. */
+const transformShape = ({ maxDimension }: ProcessLimits) => ({
+  url: sourceUrl(),
+  width: integer('width', 1, maxDimension).optional(),
+  height: integer('height', 1, maxDimension).optional(),
+  format: z
+    .preprocess(
+      (v) => (typeof v === 'string' ? (FORMAT_ALIASES[v.toLowerCase()] ?? v.toLowerCase()) : v),
+      oneOf('format', REQUESTED_FORMATS, 'jpg'),
+    )
+    .optional(),
+  quality: integer('quality', 1, 100).default(80),
+  crop: oneOf('crop', CROP_MODES).default('fill'),
+  rotate: angle('rotate').optional(),
+  flip: oneOf('flip', FLIP_MODES).optional(),
+  blur: decimal('blur', 0.3, 100).optional(),
+  grayscale: flag('grayscale').optional(),
+});
+
+export const createProcessQuerySchema = (limits: ProcessLimits) =>
+  z.object(transformShape(limits)).strict();
+
+export type ProcessQuery = z.infer<ReturnType<typeof createProcessQuerySchema>>;
+
+/** 24 hours: longer than any reasonable video, short enough to reject nonsense. */
+export const MAX_VIDEO_TIME_SECONDS = 86_400;
+
+export const createVideoQuerySchema = (limits: ProcessLimits) =>
   z
     .object({
-      url: sourceUrl(),
-      width: integer('width', 1, maxDimension).optional(),
-      height: integer('height', 1, maxDimension).optional(),
-      format: z
-        .preprocess(
-          (v) => (typeof v === 'string' ? (FORMAT_ALIASES[v.toLowerCase()] ?? v.toLowerCase()) : v),
-          oneOf('format', REQUESTED_FORMATS, 'jpg'),
-        )
-        .optional(),
-      quality: integer('quality', 1, 100).default(80),
-      crop: oneOf('crop', CROP_MODES).default('fill'),
-      rotate: angle('rotate').optional(),
-      flip: oneOf('flip', FLIP_MODES).optional(),
-      blur: decimal('blur', 0.3, 100).optional(),
-      grayscale: flag('grayscale').optional(),
+      ...transformShape(limits),
+      /** Position of the frame in seconds; decimals allowed. */
+      time: decimal('time', 0, MAX_VIDEO_TIME_SECONDS, 'seconds').default(0),
     })
     .strict();
 
-export type ProcessQuery = z.infer<ReturnType<typeof createProcessQuerySchema>>;
+export type VideoQuery = z.infer<ReturnType<typeof createVideoQuerySchema>>;

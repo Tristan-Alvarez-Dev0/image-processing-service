@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { availableParallelism } from 'node:os';
 import { z } from 'zod';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
   version: string;
 };
+
+// ffmpeg-static is CommonJS and exports the binary path (null on unsupported platforms).
+const ffmpegStatic = createRequire(import.meta.url)('ffmpeg-static') as string | null;
 
 const MB = 1024 * 1024;
 
@@ -69,10 +73,18 @@ const configSchema = z
     /** Images processed in parallel; extra requests wait their turn. */
     MAX_CONCURRENT_JOBS: positiveInt.default(availableParallelism()),
 
+    // --- Video thumbnails ---
+    /** Videos are larger than images, so they get their own size limit. */
+    VIDEO_MAX_SOURCE_BYTES: positiveInt.default(100 * MB),
+    /** Bundled static ffmpeg by default; set to use a system binary instead. */
+    FFMPEG_PATH: z.string().default(ffmpegStatic ?? 'ffmpeg'),
+
     // --- Abuse protection ---
     /** Requests per client IP per window; 0 disables rate limiting. */
     RATE_LIMIT_MAX: nonNegativeInt.default(60),
     RATE_LIMIT_WINDOW_MS: positiveInt.default(60_000),
+    /** Stricter budget for /video/thumbnail, which downloads and decodes video. */
+    VIDEO_RATE_LIMIT_MAX: positiveInt.default(10),
 
     // --- Caching ---
     /** Processed images kept in memory; 0 disables. */

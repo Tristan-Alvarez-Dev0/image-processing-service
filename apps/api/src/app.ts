@@ -5,7 +5,9 @@ import type { Config } from './config.js';
 import { AppError } from './errors/app-error.js';
 import { registerErrorHandling } from './errors/error-handler.js';
 import { healthRoutes } from './routes/health.js';
-import { processRoutes, type ProcessedImage } from './routes/process.js';
+import type { ProcessedImage } from './routes/image-response.js';
+import { processRoutes } from './routes/process.js';
+import { videoRoutes } from './routes/video.js';
 import { AddressPolicy } from './security/address-policy.js';
 import { LoadingCache } from './services/cache.js';
 import { createFetcher, type FetchedSource, type SourceFetcher } from './services/fetcher.js';
@@ -86,17 +88,38 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
     sizeOf: (result) => result.data.length,
   });
 
+  const limiter = new ConcurrencyLimiter(config.MAX_CONCURRENT_JOBS);
+  const imageLimits = {
+    maxInputPixels: config.MAX_INPUT_PIXELS,
+    timeoutMs: config.PROCESSING_TIMEOUT_MS,
+  };
+
   await app.register(healthRoutes, { version: config.APP_VERSION });
   await app.register(processRoutes, {
     fetchSource,
-    limiter: new ConcurrencyLimiter(config.MAX_CONCURRENT_JOBS),
+    limiter,
     resultCache,
     maxDimension: config.MAX_OUTPUT_DIMENSION,
-    imageLimits: {
-      maxInputPixels: config.MAX_INPUT_PIXELS,
+    imageLimits,
+    httpMaxAgeSeconds: config.HTTP_CACHE_MAX_AGE_SECONDS,
+  });
+  await app.register(videoRoutes, {
+    fetchSource: rawFetch,
+    limiter,
+    resultCache,
+    maxDimension: config.MAX_OUTPUT_DIMENSION,
+    maxSourceBytes: config.VIDEO_MAX_SOURCE_BYTES,
+    imageLimits,
+    videoLimits: {
+      ffmpegPath: config.FFMPEG_PATH,
       timeoutMs: config.PROCESSING_TIMEOUT_MS,
+      maxPixels: config.MAX_INPUT_PIXELS,
     },
     httpMaxAgeSeconds: config.HTTP_CACHE_MAX_AGE_SECONDS,
+    rateLimit:
+      config.RATE_LIMIT_MAX > 0
+        ? { max: config.VIDEO_RATE_LIMIT_MAX, timeWindow: config.RATE_LIMIT_WINDOW_MS }
+        : null,
   });
 
   return app;

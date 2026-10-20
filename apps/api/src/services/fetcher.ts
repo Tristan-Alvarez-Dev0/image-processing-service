@@ -26,7 +26,12 @@ export interface FetchOptions {
   resolve?: Resolver;
 }
 
-export type SourceFetcher = (url: string) => Promise<FetchedSource>;
+export interface FetchCallOptions {
+  /** Overrides the fetcher's default size limit (e.g. larger for videos). */
+  maxBytes?: number;
+}
+
+export type SourceFetcher = (url: string, callOpts?: FetchCallOptions) => Promise<FetchedSource>;
 
 export interface Fetcher {
   fetch: SourceFetcher;
@@ -134,7 +139,8 @@ export function createFetcher(opts: FetchOptions): Fetcher {
   });
   const policy = { addresses: opts.addresses, allowedPorts: opts.allowedPorts };
 
-  const fetchSource: SourceFetcher = async (rawUrl) => {
+  const fetchSource: SourceFetcher = async (rawUrl, callOpts) => {
+    const maxBytes = callOpts?.maxBytes ?? opts.maxBytes;
     const signal = AbortSignal.timeout(opts.timeoutMs);
     let url = new URL(rawUrl);
 
@@ -176,17 +182,17 @@ export function createFetcher(opts: FetchOptions): Fetcher {
 
         // Fail fast on an honest Content-Length; readLimited catches dishonest ones.
         const declared = Number(res.headers['content-length']);
-        if (Number.isFinite(declared) && declared > opts.maxBytes) {
+        if (Number.isFinite(declared) && declared > maxBytes) {
           discard(res.body);
           throw new AppError(
             'SOURCE_TOO_LARGE',
-            `The source is ${formatBytes(declared)}, over the ${formatBytes(opts.maxBytes)} limit`,
+            `The source is ${formatBytes(declared)}, over the ${formatBytes(maxBytes)} limit`,
           );
         }
 
         const contentType = res.headers['content-type'];
         return {
-          body: await readLimited(res.body, opts.maxBytes),
+          body: await readLimited(res.body, maxBytes),
           contentType: typeof contentType === 'string' ? contentType : undefined,
         };
       }
