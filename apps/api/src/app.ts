@@ -1,7 +1,7 @@
 import type { Writable } from 'node:stream';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
-import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import Fastify, { LogController, type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Config } from './config.js';
 import { AppError } from './errors/app-error.js';
 import { registerErrorHandling } from './errors/error-handler.js';
@@ -15,6 +15,7 @@ import { metricsRoutes } from './routes/metrics.js';
 import { buildOpenApiDocument } from './openapi/spec.js';
 import { processRoutes } from './routes/process.js';
 import { videoRoutes } from './routes/video.js';
+import { webBuildExists, webRoutes } from './routes/web.js';
 import { AddressPolicy } from './security/address-policy.js';
 import { LoadingCache } from './services/cache.js';
 import { createFetcher, type FetchedSource, type SourceFetcher } from './services/fetcher.js';
@@ -26,6 +27,8 @@ export interface AppDeps {
   /** Where JSON logs go; lets tests capture them. */
   logStream?: Writable;
 }
+
+const isRateLimitedPath = (url: string) => url.startsWith('/process') || url.startsWith('/video/');
 
 const describeWindow = (ms: number) =>
   ms % 60_000 === 0 ? `${ms / 60_000} minute${ms === 60_000 ? '' : 's'}` : `${ms / 1000} seconds`;
@@ -54,9 +57,11 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
     logger: loggerOptions(config, deps.logStream),
     trustProxy: config.TRUST_PROXY,
     genReqId: genRequestId,
-    requestIdLogLabel: 'requestId',
-    // Replaced by one structured line per request (see request-hooks).
-    disableRequestLogging: true,
+    logController: new LogController({
+      requestIdLogLabel: 'requestId',
+      // Replaced by one structured line per request (see request-hooks).
+      disableRequestLogging: true,
+    }),
   });
 
   const metrics = createMetrics();
@@ -75,8 +80,9 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
     await app.register(rateLimit, {
       max: config.RATE_LIMIT_MAX,
       timeWindow: config.RATE_LIMIT_WINDOW_MS,
-      // The docs UI loads several static assets per page view; they cost nothing to serve.
-      allowList: (request) => request.url.startsWith('/docs'),
+      // Only the processing endpoints are worth limiting; the UI and docs load
+      // several static files per page view and cost nothing to serve.
+      allowList: (request) => !isRateLimitedPath(request.url),
       errorResponseBuilder: (_request, ctx) =>
         new AppError(
           'RATE_LIMITED',
@@ -180,6 +186,12 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
         : null,
     metrics,
   });
+
+  if (webBuildExists(config.WEB_ROOT)) {
+    await app.register(webRoutes, { root: config.WEB_ROOT });
+  } else {
+    app.log.info({ root: config.WEB_ROOT }, 'web UI not built; serving the API only');
+  }
 
   return app;
 }

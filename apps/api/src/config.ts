@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { availableParallelism } from 'node:os';
 import { z } from 'zod';
 
@@ -85,6 +86,10 @@ const configSchema = z
     RATE_LIMIT_WINDOW_MS: positiveInt.default(60_000),
     /** Stricter budget for /video/thumbnail, which downloads and decodes video. */
     VIDEO_RATE_LIMIT_MAX: positiveInt.default(10),
+
+    // --- Web UI ---
+    /** The built playground UI; served at / when it exists. */
+    WEB_ROOT: z.string().default(fileURLToPath(new URL('../../web/dist', import.meta.url))),
 
     // --- Observability ---
     /** Protects /metrics with a bearer token when set (16+ characters). */
