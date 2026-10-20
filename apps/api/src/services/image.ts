@@ -63,16 +63,35 @@ function encode(pipeline: Sharp, format: OutputFormat, quality: number): Sharp {
   }
 }
 
+/**
+ * Reads image metadata. If the bytes aren't a recognisable image, the upstream
+ * Content-Type decides the error: an "image/*" response that fails to decode is
+ * corrupt (422), anything else simply isn't an image (415).
+ */
+async function readMetadata(input: Buffer, contentType: string | undefined): Promise<Metadata> {
+  try {
+    return await sharp(input).metadata();
+  } catch {
+    const mime = contentType?.split(';')[0]?.trim().toLowerCase();
+    if (mime?.startsWith('image/')) {
+      throw new AppError(
+        'UNPROCESSABLE_IMAGE',
+        `The source is labelled ${mime} but could not be decoded; it may be corrupt or truncated`,
+      );
+    }
+    throw new AppError(
+      'UNSUPPORTED_MEDIA_TYPE',
+      `The source URL did not return an image${mime ? ` (got ${mime})` : ''}`,
+    );
+  }
+}
+
 export async function transformImage(
   input: Buffer,
   opts: TransformOptions,
+  contentType?: string,
 ): Promise<TransformResult> {
-  let meta: Metadata;
-  try {
-    meta = await sharp(input).metadata();
-  } catch {
-    throw new AppError(422, 'UNPROCESSABLE_IMAGE', 'The source could not be decoded as an image');
-  }
+  const meta = await readMetadata(input, contentType);
 
   const format = resolveFormat(opts.format, meta.format);
   const animated = (meta.pages ?? 1) > 1 && ANIMATED_FORMATS.has(format);
@@ -119,6 +138,9 @@ export async function transformImage(
       },
     };
   } catch {
-    throw new AppError(422, 'UNPROCESSABLE_IMAGE', 'The source image could not be processed');
+    throw new AppError(
+      'UNPROCESSABLE_IMAGE',
+      'The source image could not be processed; it may be corrupt or truncated',
+    );
   }
 }

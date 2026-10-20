@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Config } from './config.js';
+import { registerErrorHandling } from './errors/error-handler.js';
 import { healthRoutes } from './routes/health.js';
 import { processRoutes } from './routes/process.js';
 import { createFetcher, type SourceFetcher } from './services/fetcher.js';
@@ -31,7 +33,10 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
   const app = Fastify({
     logger: loggerOptions(config),
     trustProxy: config.TRUST_PROXY,
+    genReqId: () => randomUUID(),
   });
+
+  registerErrorHandling(app);
 
   const fetchSource =
     deps.fetchSource ??

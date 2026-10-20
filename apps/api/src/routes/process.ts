@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { AppError } from '../errors/app-error.js';
 import { processQuerySchema } from '../schemas/process.js';
+import { parseQuery } from '../schemas/validate.js';
 import type { SourceFetcher } from '../services/fetcher.js';
 import { transformImage } from '../services/image.js';
 
@@ -10,16 +10,10 @@ export interface ProcessRouteOptions {
 
 export const processRoutes: FastifyPluginAsync<ProcessRouteOptions> = async (app, opts) => {
   app.get('/process', async (request, reply) => {
-    const parsed = processQuerySchema.safeParse(request.query);
-    if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      const param = issue?.path.join('.') || undefined;
-      throw new AppError(400, 'INVALID_PARAMETER', issue?.message ?? 'Invalid query', param);
-    }
-    const query = parsed.data;
+    const query = parseQuery(processQuerySchema, request.query);
 
     const source = await opts.fetchSource(query.url);
-    const result = await transformImage(source.body, query);
+    const result = await transformImage(source.body, query, source.contentType);
 
     return reply
       .header('Content-Type', `image/${result.output.format}`)
