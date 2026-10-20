@@ -6,7 +6,6 @@ export interface DocsRouteOptions {
   document: Record<string, unknown>;
 }
 
-/** Serves the OpenAPI document at /openapi.json and interactive docs at /docs. */
 export const docsRoutes: FastifyPluginAsync<DocsRouteOptions> = async (app, opts) => {
   await app.register(swagger, {
     mode: 'static',

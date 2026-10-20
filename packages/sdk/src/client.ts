@@ -22,20 +22,15 @@ export interface ClientOptions {
   baseUrl: string;
   /** Per-attempt timeout. Default 30 s. */
   timeoutMs?: number;
-  /** `false` disables retries. */
   retry?: RetryOptions | false;
-  /** Custom fetch, e.g. for testing or older runtimes. Defaults to the global fetch. */
+  /** Defaults to the global fetch. */
   fetch?: typeof fetch;
-  /** Headers sent with every request. */
   headers?: Record<string, string>;
 }
 
 export interface RequestOptions {
   signal?: AbortSignal;
-  /**
-   * Accept header, which only matters for `format: 'auto'`. Defaults to
-   * advertising AVIF and WebP, which current browsers and Node can handle.
-   */
+  /** Only matters for `format: 'auto'`. Defaults to advertising AVIF and WebP. */
   accept?: string;
 }
 
@@ -60,15 +55,7 @@ const intHeader = (headers: Headers, name: string) => {
   return value === null || value === '' ? undefined : Number(value);
 };
 
-/**
- * Client for the Image Processing Service.
- *
- * ```ts
- * const images = new ImageClient({ baseUrl: 'https://images.example.com' });
- * img.src = images.buildUrl({ url: photoUrl, width: 400, format: 'auto' });
- * const { blob, width, height } = await images.process({ url: photoUrl, width: 400 });
- * ```
- */
+/** Client for the Image Processing Service. See the package README for examples. */
 export class ImageClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
@@ -88,22 +75,22 @@ export class ImageClient {
     this.headers = options.headers ?? {};
   }
 
-  /** The URL for an image transformation. Pure: no network. Ideal for `<img src>`. */
+  /** No network; ideal for `<img src>`. */
   buildUrl(options: ProcessOptions): string {
     return `${joinUrl(this.baseUrl, '/process')}?${buildQuery(options)}`;
   }
 
-  /** The URL for a video thumbnail. Pure: no network. */
+  /** No network. */
   videoThumbnailUrl(options: VideoThumbnailOptions): string {
     return `${joinUrl(this.baseUrl, '/video/thumbnail')}?${buildQuery(options)}`;
   }
 
-  /** Fetches a transformed image with its metadata. Throws ImageApiError on failure. */
+  /** Throws ImageApiError on failure. */
   process(options: ProcessOptions, request: RequestOptions = {}): Promise<ImageResult> {
     return this.fetchImage(this.buildUrl(options), options.format === 'auto', request);
   }
 
-  /** Fetches a video thumbnail with its metadata. Throws ImageApiError on failure. */
+  /** Throws ImageApiError on failure. */
   videoThumbnail(
     options: VideoThumbnailOptions,
     request: RequestOptions = {},
@@ -150,7 +137,6 @@ export class ImageClient {
     };
   }
 
-  /** GET with timeout, retries and typed errors. Returns only 2xx responses. */
   private async send(
     url: string,
     headers: Record<string, string>,
@@ -236,7 +222,7 @@ async function toApiError(res: Response): Promise<ImageApiError> {
       });
     }
   } catch {
-    // Not JSON: fall through.
+    // Not the API's JSON error format: reported as INVALID_RESPONSE below.
   }
   return new ImageApiError({
     code: 'INVALID_RESPONSE',

@@ -28,7 +28,7 @@ export const processRoutes: FastifyPluginAsync<ProcessRouteOptions> = async (app
     const negotiated = query.format === 'auto';
     const params = {
       ...query,
-      // Canonical URL form (lower-case host, default port dropped) for a better cache hit rate.
+      // Canonical form (lower-case host, no default port) for better cache hits.
       url: new URL(query.url).href,
       // Only format=auto depends on the Accept header, so only then is it part of the key.
       accept: negotiated ? parseAccept(request.headers.accept) : undefined,

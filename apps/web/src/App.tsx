@@ -1,4 +1,4 @@
-import { BookOpen, FileJson, Wand2 } from 'lucide-react';
+import { BookOpen, FileJson } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Controls } from '@/components/Controls';
 import { ErrorBanner } from '@/components/ErrorBanner';
@@ -20,7 +20,6 @@ import {
 
 interface Applied {
   form: FormState;
-  /** Counts button presses, so pressing again re-runs an identical request. */
   run: number;
 }
 
@@ -38,8 +37,7 @@ export function App() {
     );
   }, []);
 
-  // Editing only changes `form`; the API is called with `applied`, which is
-  // set when the user presses the button (or Enter).
+  // Editing changes `form`; the API only sees `applied`, set on button press or Enter.
   const [applied, setApplied] = useState<Applied>();
   const request = useMemo(() => applied && prepareRequest(applied.form, applied.run), [applied]);
   const original = useImage(request?.original);
@@ -51,7 +49,7 @@ export function App() {
   const run = () => {
     if (!form.url.trim()) return;
     setApplied((prev) => ({ form, run: (prev?.run ?? 0) + 1 }));
-    // On narrow screens the results are below the controls; bring them into view.
+    // On narrow screens the results are below the controls.
     if (window.matchMedia('(max-width: 1023px)').matches) {
       results.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -66,23 +64,15 @@ export function App() {
   const update = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
 
   return (
-    // On laptop/desktop screens the page is exactly one screen tall: the
-    // controls card and the results each scroll on their own, so the
-    // Process button in the card footer is always visible. The scrollers are
-    // `relative` so absolutely positioned children (like the hidden native
-    // <select> behind the dropdown) can't stretch the page.
+    // Desktop: one screen tall and each column scrolls, so the run button stays visible.
+    // The scrollers are `relative` so the dropdown's hidden <select> can't stretch the page.
     <div className="mx-auto flex max-w-[1440px] flex-col px-4 py-6 sm:px-6 lg:h-dvh">
       <header className="mb-6 flex shrink-0 flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground">
-            <Wand2 className="size-5" />
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">Image Processing Playground</h1>
-            <p className="text-sm text-muted-foreground">
-              Resize, convert and transform images and video frames, live.
-            </p>
-          </div>
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Image Processing Playground</h1>
+          <p className="text-sm text-muted-foreground">
+            Resize, crop and convert images, or grab a frame from a video.
+          </p>
         </div>
         <nav className="flex items-center gap-2">
           {version !== undefined && (
@@ -154,10 +144,6 @@ export function App() {
               empty={empty}
             />
           </div>
-          <p className="text-center text-xs text-muted-foreground">
-            Each run calls the public API through the TypeScript SDK. Nothing here uses a private
-            endpoint.
-          </p>
         </div>
       </main>
     </div>

@@ -46,7 +46,6 @@ export async function makeVideoFixtures() {
       ]),
     ]);
 
-    // A valid MP4 signature followed by garbage.
     const corrupt = Buffer.concat([redThenBlue.subarray(0, 32), Buffer.alloc(2000, 7)]);
     const hlsPlaylist = Buffer.from('#EXTM3U\n#EXTINF:1,\nhttp://169.254.169.254/x.ts\n');
 

@@ -21,14 +21,11 @@ export interface Route {
 
 export interface FixtureServer {
   url: (path: string) => string;
-  /** Number of requests received per path. */
   hits: Map<string, number>;
-  /** Headers of the most recent request per path. */
   lastHeaders: Map<string, IncomingHttpHeaders>;
   close: () => Promise<void>;
 }
 
-/** A tiny local HTTP server that plays the role of the remote image host. */
 export async function startFixtureServer(routes: Record<string, Route>): Promise<FixtureServer> {
   const hits = new Map<string, number>();
   const lastHeaders = new Map<string, IncomingHttpHeaders>();

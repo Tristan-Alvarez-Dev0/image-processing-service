@@ -3,7 +3,6 @@ import { z } from 'zod';
 export const OUTPUT_FORMATS = ['jpeg', 'png', 'webp', 'avif', 'gif'] as const;
 export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
 
-/** `auto` picks the best format the client accepts (see services/format-negotiation). */
 export const REQUESTED_FORMATS = [...OUTPUT_FORMATS, 'auto'] as const;
 export type RequestedFormat = (typeof REQUESTED_FORMATS)[number];
 
@@ -24,10 +23,7 @@ export type CropMode = (typeof CROP_MODES)[number];
 
 const FORMAT_ALIASES: Record<string, string> = { jpg: 'jpeg' };
 
-/**
- * Parses a query value as a whole number. Stricter than Number(): rejects
- * "1e3", "0x10", "12px", " 12" and "1.5" so typos don't silently pass.
- */
+/** Stricter than Number(): rejects "1e3", "0x10", "12px" and "1.5". */
 const integer = (name: string, min: number, max?: number) => {
   const range =
     max === undefined ? `a whole number >= ${min}` : `a whole number from ${min} to ${max}`;
@@ -92,7 +88,6 @@ export const sourceUrl = () =>
       }),
     );
 
-/** The transformation parameters shared by /process and /video/thumbnail. */
 const transformShape = ({ maxDimension }: ProcessLimits) => ({
   url: sourceUrl(),
   width: integer('width', 1, maxDimension).optional(),
@@ -116,14 +111,12 @@ export const createProcessQuerySchema = (limits: ProcessLimits) =>
 
 export type ProcessQuery = z.infer<ReturnType<typeof createProcessQuerySchema>>;
 
-/** 24 hours: longer than any reasonable video, short enough to reject nonsense. */
 export const MAX_VIDEO_TIME_SECONDS = 86_400;
 
 export const createVideoQuerySchema = (limits: ProcessLimits) =>
   z
     .object({
       ...transformShape(limits),
-      /** Position of the frame in seconds; decimals allowed. */
       time: decimal('time', 0, MAX_VIDEO_TIME_SECONDS, 'seconds').default(0),
     })
     .strict();

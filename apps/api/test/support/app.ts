@@ -2,16 +2,13 @@ import { buildApp, type AppDeps } from '../../src/app.js';
 import { loadConfig, type Config } from '../../src/config.js';
 
 /**
- * Tests talk to a fixture server on 127.0.0.1 with a random port, so by
- * default that one loopback address and any port are allowed. SSRF tests
- * override these to get production behaviour. Rate limiting is off by
- * default so unrelated suites don't trip it.
+ * Allows the fixture server (127.0.0.1, random port) and turns rate limiting off;
+ * SSRF and rate-limit tests override these to get production behaviour.
  */
 const TEST_DEFAULTS = {
   NODE_ENV: 'test',
   ALLOW_PRIVATE_ADDRESSES: '127.0.0.1',
   ALLOWED_PORTS: '*',
-  // Suites fire many requests; rate-limit tests opt back in explicitly.
   RATE_LIMIT_MAX: '0',
 };
 

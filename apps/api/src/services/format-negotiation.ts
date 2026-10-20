@@ -5,11 +5,7 @@ export interface AcceptedFormats {
   webp: boolean;
 }
 
-/**
- * Reads which modern formats the client explicitly supports. Wildcards
- * (`image/*`, `*\/*`) are ignored on purpose: browsers send them even when
- * they cannot decode AVIF, so only an explicit `image/avif` counts.
- */
+/** Wildcards are ignored: browsers send them even when they can't decode AVIF. */
 export function parseAccept(header: string | undefined): AcceptedFormats {
   const accepted = new Set<string>();
   for (const part of (header ?? '').split(',')) {
@@ -20,11 +16,7 @@ export function parseAccept(header: string | undefined): AcceptedFormats {
   return { avif: accepted.has('image/avif'), webp: accepted.has('image/webp') };
 }
 
-/**
- * Picks the smallest format the client can display:
- * AVIF > WebP > (PNG if the image has transparency, else JPEG).
- * Animations need a format that animates: WebP, else GIF.
- */
+/** AVIF > WebP > PNG (with alpha) or JPEG. Animations need WebP or GIF. */
 export function chooseAutoFormat(
   accepts: AcceptedFormats,
   source: { hasAlpha: boolean; animated: boolean },

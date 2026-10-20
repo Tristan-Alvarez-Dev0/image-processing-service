@@ -24,7 +24,6 @@ import { ConcurrencyLimiter } from './services/limiter.js';
 /** Collaborators that tests can swap out. */
 export interface AppDeps {
   fetchSource?: SourceFetcher;
-  /** Where JSON logs go; lets tests capture them. */
   logStream?: Writable;
 }
 
@@ -48,10 +47,7 @@ function loggerOptions(config: Config, stream?: Writable): FastifyServerOptions[
   return { level: config.LOG_LEVEL };
 }
 
-/**
- * Builds the Fastify app without starting it, so tests can drive it
- * through `app.inject()` and the server entrypoint can call `listen()`.
- */
+/** Builds the app without listening, so tests can use `app.inject()`. */
 export async function buildApp(config: Config, deps: AppDeps = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: loggerOptions(config, deps.logStream),
@@ -80,8 +76,7 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
     await app.register(rateLimit, {
       max: config.RATE_LIMIT_MAX,
       timeWindow: config.RATE_LIMIT_WINDOW_MS,
-      // Only the processing endpoints are worth limiting; the UI and docs load
-      // several static files per page view and cost nothing to serve.
+      // Only processing is worth limiting; UI and docs assets are cheap.
       allowList: (request) => !isRateLimitedPath(request.url),
       errorResponseBuilder: (_request, ctx) =>
         new AppError(

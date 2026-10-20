@@ -56,7 +56,6 @@ function thumb(
   });
 }
 
-/** Colour name of the centre pixel. */
 async function centreColour(res: LightMyRequestResponse) {
   const { data, info } = await sharp(res.rawPayload)
     .removeAlpha()

@@ -6,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { curlCommand } from '@/lib/playground';
 
 interface Props {
-  /** Path + query of the request, e.g. `/process?url=…`. */
   path: string | undefined;
   negotiated: boolean;
 }

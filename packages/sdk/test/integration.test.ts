@@ -1,7 +1,4 @@
-/**
- * Runs the SDK against the real API server, so URL building, headers and
- * error parsing are checked end to end, not against assumptions.
- */
+// Runs against the real API, so URLs, headers and errors are checked end to end.
 import type { FastifyInstance } from 'fastify';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';

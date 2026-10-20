@@ -34,16 +34,10 @@ function fromFastifyError(err: FastifyError): AppError | undefined {
   return new AppError('INVALID_PARAMETER', err.message);
 }
 
-/**
- * Every error leaves the API in the same shape:
- * `{ "error": { "code", "message", "param"?, "details"?, "requestId" } }`.
- * Unexpected errors are logged in full but reported to the client generically,
- * so stack traces and internal messages never leak.
- */
+/** One error shape everywhere; unexpected errors are logged but never leaked to clients. */
 export function registerErrorHandling(app: FastifyInstance) {
   app.setErrorHandler<FastifyError>((err, request, reply) => {
     const appError = err instanceof AppError ? err : fromFastifyError(err);
-    // Expected errors are reported in the per-request log line (see request-hooks).
     if (appError) return send(reply, request, appError);
 
     request.log.error({ err }, 'unhandled error');

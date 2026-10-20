@@ -18,7 +18,6 @@ beforeAll(async () => {
   png = (await makeFixtures()).png;
 });
 
-/** Collects JSON log lines written by the app. */
 function logCollector() {
   const lines: Record<string, unknown>[] = [];
   const raw: string[] = [];
@@ -45,7 +44,6 @@ afterEach(() => app?.close());
 const processUrl = (url = SECRET_URL, extra = '') =>
   `/process?url=${encodeURIComponent(url)}${extra}`;
 
-/** Reads one sample from Prometheus text output, matching all given labels. */
 function sample(
   text: string,
   name: string,

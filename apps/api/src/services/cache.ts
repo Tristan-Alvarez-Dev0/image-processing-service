@@ -5,7 +5,6 @@ export interface CacheOptions<V> {
   maxBytes: number;
   ttlMs: number;
   sizeOf: (value: V) => number;
-  /** Called on every lookup, e.g. to record hit-rate metrics. */
   onLookup?: (hit: boolean) => void;
 }
 
@@ -15,11 +14,7 @@ export interface CacheResult<V> {
   hit: boolean;
 }
 
-/**
- * An in-memory LRU cache with a byte budget that also de-duplicates
- * concurrent loads: if 50 identical requests arrive at once, the loader runs
- * once and all 50 share the result. Failed loads are never cached.
- */
+/** In-memory LRU with a byte budget. Concurrent identical loads share one run; failures aren't cached. */
 export class LoadingCache<V extends object> {
   private readonly lru: LRUCache<string, V> | undefined;
   private readonly inFlight = new Map<string, Promise<V>>();

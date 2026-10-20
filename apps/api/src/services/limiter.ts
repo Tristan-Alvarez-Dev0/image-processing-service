@@ -1,8 +1,4 @@
-/**
- * Caps how many jobs run at once; extra callers wait in FIFO order.
- * Image processing is CPU- and memory-bound, so unbounded parallelism makes
- * every request slower and risks running out of memory under load.
- */
+/** Caps concurrent jobs (FIFO queue), since image work is CPU- and memory-bound. */
 export class ConcurrencyLimiter {
   private active = 0;
   private readonly waiting: Array<() => void> = [];

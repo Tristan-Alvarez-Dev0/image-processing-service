@@ -12,10 +12,8 @@ import {
 /** Same origin: the API serves this UI in production, Vite proxies it in development. */
 export const client = new ImageClient({
   baseUrl: '',
-  // Longer than the server's own limits (60 s to download a video, then
-  // processing), so the API's clear error arrives instead of a client timeout.
+  // Longer than the server's limits, so its clear error arrives before a client timeout.
   timeoutMs: 120_000,
-  // Interactive use: a short retry is fine, but never keep the user waiting long.
   retry: { retries: 1, baseDelayMs: 300, maxDelayMs: 3_000 },
 });
 
@@ -69,7 +67,6 @@ export const TRANSFORM_DEFAULTS: Omit<FormState, 'mode' | 'url' | 'time'> = {
 type Options = ProcessOptions | VideoThumbnailOptions;
 
 export interface PanelRequest {
-  /** The exact URL requested. */
   key: string;
   /** Increments on every button press, so pressing again re-runs the same URL. */
   run: number;
@@ -100,7 +97,7 @@ function panel(mode: Mode, options: Options, run: number): PanelRequest {
       };
 }
 
-/** Turns the form into API requests. Default values are left out to keep URLs short. */
+/** Default values are left out to keep URLs short. */
 export function prepareRequest(form: FormState, run = 0): PreparedRequest | undefined {
   const url = form.url.trim();
   if (!url) return undefined;
@@ -127,10 +124,8 @@ export function prepareRequest(form: FormState, run = 0): PreparedRequest | unde
   };
 }
 
-/** Quotes a value for a POSIX shell. */
 const shellQuote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
 
-/** A copy-pasteable curl command that saves the image and prints the response headers. */
 export function curlCommand(absoluteUrl: string, negotiated: boolean): string {
   const accept = negotiated ? ` -H ${shellQuote('Accept: image/avif,image/webp,*/*')}` : '';
   return `curl -sS -D -${accept} -o output ${shellQuote(absoluteUrl)}`;
@@ -142,7 +137,6 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-/** "42% smaller" / "3% larger" compared with the source. */
 export function sizeChange(output: number, original: number): string | undefined {
   if (!original) return undefined;
   const change = Math.round((1 - output / original) * 100);

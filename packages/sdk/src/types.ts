@@ -1,4 +1,3 @@
-/** Formats the service can produce. */
 export const OUTPUT_FORMATS = ['jpeg', 'png', 'webp', 'avif', 'gif'] as const;
 export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
 
@@ -38,7 +37,6 @@ export interface TransformOptions {
 }
 
 export interface ProcessOptions extends TransformOptions {
-  /** Absolute http(s) URL of the source image. */
   url: string;
 }
 
@@ -63,19 +61,16 @@ export interface SourceInfo {
 export interface ImageResult {
   /** The processed image. Use `URL.createObjectURL(blob)` to display it in a browser. */
   blob: Blob;
-  /** e.g. `image/webp`. */
   contentType: string;
   width: number;
   height: number;
   /** Bytes. */
   size: number;
   original: SourceInfo;
-  /** Whether the server served it from its cache. */
   cache: 'HIT' | 'MISS' | undefined;
   etag: string | undefined;
   /** Quote this when reporting a problem. */
   requestId: string | undefined;
-  /** The exact URL that was requested. */
   url: string;
 }
 

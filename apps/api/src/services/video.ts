@@ -9,27 +9,20 @@ export type VideoContainer = 'mp4' | 'mov' | 'webm';
 export interface VideoLimits {
   ffmpegPath: string;
   timeoutMs: number;
-  /** Refuse to decode frames larger than this (width x height). */
   maxPixels: number;
 }
 
 export interface ExtractedFrame {
-  /** The frame as a lossless PNG, ready for the image pipeline. */
   png: Buffer;
   container: VideoContainer;
   durationSeconds: number | undefined;
 }
 
-/** A decoded frame is at most ~100 MB as PNG even for 8K video; anything bigger is abuse. */
+/** Generous for one PNG frame, even from 8K video. */
 const MAX_FRAME_BYTES = 100 * 1024 * 1024;
 const STDERR_TAIL_BYTES = 16 * 1024;
 
-/**
- * Identifies the container from its first bytes. The URL extension and
- * Content-Type are ignored: both are trivially spoofed.
- * - MP4/MOV (ISO base media): "ftyp" at offset 4; brand "qt  " means QuickTime
- * - WebM/Matroska (EBML): 1A 45 DF A3
- */
+/** From the bytes, since extensions lie: "ftyp" at byte 4 (MP4/MOV) or the EBML magic (WebM). */
 export function detectVideoContainer(data: Buffer): VideoContainer | undefined {
   if (data.length >= 12 && data.toString('latin1', 4, 8) === 'ftyp') {
     return data.toString('latin1', 8, 12) === 'qt  ' ? 'mov' : 'mp4';
@@ -38,7 +31,6 @@ export function detectVideoContainer(data: Buffer): VideoContainer | undefined {
   return undefined;
 }
 
-/** Parses "Duration: 00:01:02.50" from ffmpeg's log output. */
 export function parseDuration(log: string): number | undefined {
   const m = /Duration: (\d+):(\d{2}):(\d{2}(?:\.\d+)?)/.exec(log);
   if (!m) return undefined;
@@ -85,12 +77,8 @@ function runFfmpeg(path: string, args: string[], timeoutMs: number): Promise<Ffm
 }
 
 /**
- * Extracts the frame at `timeSeconds` from an in-memory video.
- *
- * The video is written to a private temp directory because MP4 files often
- * store their index at the end, which ffmpeg can only reach by seeking.
- * ffmpeg is restricted to the local file protocol, so a crafted file cannot
- * make it open URLs or other files (a classic SSRF/LFI vector).
+ * Writes the video to a temp dir (MP4 indexes are often at the end, so ffmpeg
+ * must seek) and restricts ffmpeg to local files, so a crafted file can't make it fetch URLs.
  */
 export async function extractFrame(
   input: Buffer,

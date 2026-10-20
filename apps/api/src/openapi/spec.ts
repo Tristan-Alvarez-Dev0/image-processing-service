@@ -7,7 +7,7 @@ import {
   OUTPUT_FORMATS,
 } from '../schemas/process.js';
 
-/** The limits the docs quote, taken from the running config so they never go stale. */
+/** From the running config, so the docs never go stale. */
 export interface DocumentedLimits {
   version: string;
   maxDimension: number;
@@ -37,7 +37,6 @@ type Parameter = {
   example?: unknown;
 };
 
-/** Query parameters shared by /process and /video/thumbnail. */
 function transformParameters(l: DocumentedLimits, kind: 'image' | 'video'): Parameter[] {
   const defaultFormat =
     kind === 'image'
@@ -157,7 +156,6 @@ const rateLimitHeaders = {
   'X-RateLimit-Reset': header('Seconds until the window resets.', { type: 'integer' }),
 };
 
-/** Which error codes each status can carry, to document real examples per status. */
 function codesByStatus(codes: readonly ErrorCode[]) {
   const byStatus = new Map<number, ErrorCode[]>();
   for (const code of codes) {

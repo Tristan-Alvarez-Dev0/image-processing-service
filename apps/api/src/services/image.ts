@@ -13,7 +13,6 @@ export interface TransformOptions {
   /** Degrees clockwise, 0-359. Applied before resizing. */
   rotate?: number | undefined;
   flip?: FlipMode | undefined;
-  /** Gaussian blur sigma. */
   blur?: number | undefined;
   grayscale?: boolean | undefined;
   /** What the client accepts; only used for format=auto. */
@@ -46,10 +45,7 @@ const ANIMATED_FORMATS: ReadonlySet<OutputFormat> = new Set(['gif', 'webp']);
 const isOutputFormat = (f: string | undefined): f is OutputFormat =>
   (OUTPUT_FORMATS as readonly string[]).includes(f ?? '');
 
-/**
- * Explicit formats win. `auto` negotiates with the client. With no format,
- * keep the source format when we can encode it, otherwise PNG (lossless, keeps alpha).
- */
+/** Explicit format wins; `auto` negotiates; otherwise keep the source format, or PNG. */
 function resolveFormat(opts: TransformOptions, meta: Metadata, frames: number): OutputFormat {
   const requested = opts.format;
   if (requested === 'auto') {
@@ -63,11 +59,9 @@ function resolveFormat(opts: TransformOptions, meta: Metadata, frames: number): 
   return isOutputFormat(meta.format) ? meta.format : 'png';
 }
 
-/** Transparent where the format supports it, white for JPEG. */
 const backgroundFor = (format: OutputFormat) =>
   format === 'jpeg' ? { r: 255, g: 255, b: 255, alpha: 1 } : { r: 0, g: 0, b: 0, alpha: 0 };
 
-/** Bounding box of a w x h image rotated by `deg` degrees. */
 function rotatedSize(w: number, h: number, deg: number): [number, number] {
   if (deg % 180 === 0) return [w, h];
   if (deg % 90 === 0) return [h, w];
@@ -92,11 +86,7 @@ function encode(pipeline: Sharp, format: OutputFormat, quality: number): Sharp {
   }
 }
 
-/**
- * Reads image metadata. If the bytes aren't a recognisable image, the upstream
- * Content-Type decides the error: an "image/*" response that fails to decode is
- * corrupt (422), anything else simply isn't an image (415).
- */
+/** Undecodable bytes labelled image/* are corrupt (422); anything else isn't an image (415). */
 async function readMetadata(input: Buffer, contentType: string | undefined): Promise<Metadata> {
   try {
     return await sharp(input).metadata();
@@ -115,7 +105,7 @@ async function readMetadata(input: Buffer, contentType: string | undefined): Pro
   }
 }
 
-/** Detected from the file's bytes, never from the URL or Content-Type. `heif` covers AVIF. */
+/** Detected from the bytes, not the URL or Content-Type. `heif` covers AVIF. */
 export const SUPPORTED_INPUT_FORMATS: ReadonlySet<string> = new Set([
   'jpeg',
   'png',
@@ -135,7 +125,6 @@ export interface ImageLimits {
 const megapixels = (px: number) =>
   px >= 1_000_000 ? `${Math.round(px / 100_000) / 10} MP` : `${px.toLocaleString('en-US')} pixels`;
 
-/** Upper bound of the output size in pixels for a single frame. */
 function estimateOutputPixels(srcW: number, srcH: number, opts: TransformOptions): number {
   const clampW = (w: number) => (opts.crop === 'limit' ? Math.min(w, srcW) : w);
   const clampH = (h: number) => (opts.crop === 'limit' ? Math.min(h, srcH) : h);
@@ -203,7 +192,6 @@ export async function transformImage(
     );
   }
 
-  // Rotation happens before resizing, so the resize works on the rotated canvas.
   const [rotW, rotH] = rotatedSize(srcW, srcH, opts.rotate ?? 0);
   const outputPixels = estimateOutputPixels(rotW, rotH, opts) * (animated ? frames : 1);
   if (outputPixels > limits.maxInputPixels) {
@@ -215,8 +203,7 @@ export async function transformImage(
     );
   }
 
-  // Order: orient (EXIF) -> flip -> rotate -> resize -> blur -> grayscale.
-  // Orienting and rotating first means width/height always describe the final image.
+  // Orient and rotate before resizing, so width/height describe the final image.
   let pipeline = sharp(input, { animated, limitInputPixels: limits.maxInputPixels })
     .timeout({ seconds: Math.max(1, Math.ceil(limits.timeoutMs / 1000)) })
     .autoOrient();
@@ -239,7 +226,7 @@ export async function transformImage(
   }
 
   if (opts.blur) pipeline = pipeline.blur(opts.blur);
-  // Store as a single channel where the format allows it: ~half the size for PNG.
+  // Single channel: about half the size for PNG.
   if (opts.grayscale) pipeline = pipeline.greyscale().toColourspace('b-w');
   if (format === 'jpeg') pipeline = pipeline.flatten({ background: '#ffffff' });
 

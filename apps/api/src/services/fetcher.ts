@@ -27,9 +27,7 @@ export interface FetchOptions {
 }
 
 export interface FetchCallOptions {
-  /** Overrides the fetcher's default size limit (e.g. larger for videos). */
   maxBytes?: number;
-  /** Overrides the fetcher's default time budget (e.g. longer for videos). */
   timeoutMs?: number;
 }
 
@@ -58,7 +56,6 @@ const NETWORK_ERRORS: Record<string, string> = {
 const formatBytes = (n: number) =>
   n >= 1024 * 1024 ? `${Math.round((n / 1024 / 1024) * 10) / 10} MB` : `${Math.ceil(n / 1024)} KB`;
 
-/** Walks an error and its `cause` chain looking for something we recognise. */
 function findCause<T>(err: unknown, pick: (e: unknown) => T | undefined): T | undefined {
   for (let e = err, depth = 0; e && depth < 5; e = (e as { cause?: unknown }).cause, depth++) {
     const hit = pick(e);
@@ -70,9 +67,7 @@ function findCause<T>(err: unknown, pick: (e: unknown) => T | undefined): T | un
 /** How far a download got, so a timeout can say what happened. */
 interface Progress {
   received: number;
-  /** From Content-Length, when the source sent one. */
   expected: number | undefined;
-  /** True once response headers arrived and the body is being read. */
   downloading: boolean;
 }
 
@@ -118,10 +113,7 @@ function toAppError(
 
 type Body = Dispatcher.ResponseData['body'];
 
-/**
- * Abandons a response body. undici emits an AbortError on destroy, and an
- * unhandled 'error' event would crash the process, so swallow it here.
- */
+/** undici emits an AbortError on destroy; left unhandled it would crash the process. */
 function discard(body: Body): void {
   body.on('error', () => {});
   body.destroy();
@@ -146,12 +138,8 @@ async function readLimited(body: Body, maxBytes: number, progress: Progress) {
 }
 
 /**
- * Fetches untrusted URLs safely:
- * - every hop (original URL and each redirect) passes `assertFetchableUrl`
- * - DNS answers are checked on the connection itself (no rebinding window)
- * - redirects are followed manually, up to `maxRedirects`
- * - one deadline covers connect, redirects and download
- * - the body is streamed and abandoned as soon as it exceeds `maxBytes`
+ * Fetches untrusted URLs: every redirect hop is re-validated, DNS is checked on
+ * the connection itself, and one deadline and size cap cover the whole download.
  */
 export function createFetcher(opts: FetchOptions): Fetcher {
   const agent = new Agent({

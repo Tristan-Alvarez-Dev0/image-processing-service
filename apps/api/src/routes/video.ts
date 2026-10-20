@@ -21,7 +21,6 @@ export interface VideoRouteOptions {
   imageLimits: ImageLimits;
   videoLimits: VideoLimits;
   httpMaxAgeSeconds: number;
-  /** Per-route rate limit, stricter than the global one (null when rate limiting is off). */
   rateLimit: { max: number; timeWindow: number } | null;
   metrics: Metrics;
 }
@@ -38,7 +37,6 @@ export const videoRoutes: FastifyPluginAsync<VideoRouteOptions> = async (app, op
       const params = {
         ...query,
         url: new URL(query.url).href,
-        // A video frame has no "source format" worth keeping, so default to JPEG.
         format: query.format ?? 'jpeg',
         accept: negotiated ? parseAccept(request.headers.accept) : undefined,
       };

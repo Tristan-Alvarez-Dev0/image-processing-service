@@ -28,7 +28,6 @@ export async function makeFixtures() {
     .jpeg()
     .toBuffer();
 
-  // Two-frame animated GIF, 100x80 per frame.
   const frame = (color: string) =>
     sharp({ create: { width: 100, height: 80, channels: 3, background: color } })
       .png()

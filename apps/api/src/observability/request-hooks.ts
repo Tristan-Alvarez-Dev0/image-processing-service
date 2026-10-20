@@ -4,19 +4,15 @@ import type { Metrics } from './metrics.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
-    /** Set by the error handler, so logs and metrics can report it. */
     errorCode: ErrorCode | undefined;
   }
 }
 
-/** Infrastructure polling and docs assets; logged at debug level to keep logs readable. */
+/** Health checks, scrapes and docs assets log at debug level. */
 const isQuiet = (route: string) =>
   route === '/health' || route === '/metrics' || route.startsWith('/docs');
 
-/**
- * Only the host of the source is logged: full source URLs often carry signed
- * tokens or identify what a user is viewing, and don't belong in logs.
- */
+/** Only the host: full source URLs can carry signed tokens. */
 function sourceHost(request: FastifyRequest): string | undefined {
   const url = (request.query as Record<string, unknown> | undefined)?.url;
   if (typeof url !== 'string') return undefined;
@@ -27,11 +23,7 @@ function sourceHost(request: FastifyRequest): string | undefined {
   }
 }
 
-/**
- * Per-request observability: echoes the request ID, records HTTP metrics and
- * writes exactly one structured log line per request. Client IPs, headers and
- * query strings are deliberately not logged.
- */
+/** One log line per request. Client IPs, headers and query strings are never logged. */
 export function registerRequestHooks(app: FastifyInstance, metrics: Metrics) {
   app.decorateRequest('errorCode', undefined);
 

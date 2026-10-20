@@ -1,9 +1,6 @@
 import type { ProcessOptions, VideoThumbnailOptions } from './types.js';
 
-/**
- * Parameters are always written in this order, so the same options always
- * produce the same URL: CDNs and browser caches key on the exact URL.
- */
+/** Fixed order, so the same options always give the same URL (better CDN caching). */
 const PARAM_ORDER = [
   'url',
   'width',

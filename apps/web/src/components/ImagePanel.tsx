@@ -10,9 +10,8 @@ interface Props {
   title: string;
   description: string;
   state: PanelState;
-  /** Show the true source details (from X-Original-* headers) instead of the returned image's. */
+  /** Show the source's details (X-Original-* headers) instead of the output's. */
   showSource?: boolean;
-  /** Original size in bytes, to compare against. */
   compareTo?: number | undefined;
   empty: boolean;
 }
@@ -33,7 +32,6 @@ export function ImagePanel({ title, description, state, showSource, compareTo, e
   const show = result && !error && !empty;
   const change = show && compareTo !== undefined ? sizeChange(result.size, compareTo) : undefined;
 
-  // The processed panel shows whether the API served it from cache.
   const badge =
     show && !showSource ? (
       <Badge

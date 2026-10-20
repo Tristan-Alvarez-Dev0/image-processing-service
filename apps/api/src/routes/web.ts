@@ -4,14 +4,10 @@ import fastifyStatic from '@fastify/static';
 import type { FastifyPluginAsync } from 'fastify';
 
 export interface WebRouteOptions {
-  /** The built UI (apps/web/dist). */
   root: string;
 }
 
-/**
- * The UI only talks to this origin and shows blob: images, so it can run
- * under a strict policy. Inline styles are allowed for React's style props.
- */
+// The UI only calls this origin and shows blob: images; inline styles are for React.
 const UI_CSP = [
   "default-src 'self'",
   "img-src 'self' blob: data:",
@@ -27,7 +23,6 @@ export function webBuildExists(root: string): boolean {
   return existsSync(join(root, 'index.html'));
 }
 
-/** Serves the playground UI at `/`, from the same origin as the API it calls. */
 export const webRoutes: FastifyPluginAsync<WebRouteOptions> = async (app, opts) => {
   await app.register(fastifyStatic, {
     root: opts.root,

@@ -42,7 +42,6 @@ const configSchema = z
       .default('false')
       .transform((v) => v === 'true'),
 
-    // --- Fetching untrusted URLs ---
     /** Total time budget for fetching the source, across all redirects. */
     FETCH_TIMEOUT_MS: positiveInt.default(10_000),
     MAX_SOURCE_BYTES: positiveInt.default(15 * MB),
@@ -60,58 +59,38 @@ const configSchema = z
         }
         return new Set(ports);
       }),
-    /**
-     * Private/internal IPs that may be fetched anyway. For local development
-     * and tests only (e.g. "127.0.0.1"); refused in production.
-     */
+    /** Private IPs to allow anyway (e.g. 127.0.0.1). Dev/test only; refused in production. */
     ALLOW_PRIVATE_ADDRESSES: commaList,
 
-    // --- Processing ---
     MAX_OUTPUT_DIMENSION: positiveInt.default(4000),
     /** Decompression-bomb guard: max decoded pixels (width x height x frames). */
     MAX_INPUT_PIXELS: positiveInt.default(50_000_000),
     PROCESSING_TIMEOUT_MS: positiveInt.default(15_000),
-    /** Images processed in parallel; extra requests wait their turn. */
     MAX_CONCURRENT_JOBS: positiveInt.default(availableParallelism()),
 
-    // --- Video thumbnails ---
-    /** Videos are larger than images, so they get their own size limit. */
     VIDEO_MAX_SOURCE_BYTES: positiveInt.default(100 * MB),
-    /**
-     * Time budget to download a video. Videos are far larger than images, and
-     * CDN throughput varies a lot (we measured 0.8-5 MB/s for the same file),
-     * so 10 s is not enough for a typical 20-30 MB clip.
-     */
+    /** Videos are large and CDN speed varies widely (0.8-5 MB/s measured), so 10 s is too short. */
     VIDEO_FETCH_TIMEOUT_MS: positiveInt.default(60_000),
-    /** Bundled static ffmpeg by default; set to use a system binary instead. */
     FFMPEG_PATH: z.string().default(ffmpegStatic ?? 'ffmpeg'),
 
-    // --- Abuse protection ---
     /** Requests per client IP per window; 0 disables rate limiting. */
     RATE_LIMIT_MAX: nonNegativeInt.default(60),
     RATE_LIMIT_WINDOW_MS: positiveInt.default(60_000),
-    /** Stricter budget for /video/thumbnail, which downloads and decodes video. */
     VIDEO_RATE_LIMIT_MAX: positiveInt.default(10),
 
-    // --- Web UI ---
-    /** The built playground UI; served at / when it exists. */
     WEB_ROOT: z.string().default(fileURLToPath(new URL('../../web/dist', import.meta.url))),
 
-    // --- Observability ---
-    /** Protects /metrics with a bearer token when set (16+ characters). */
     METRICS_TOKEN: z.preprocess(
       (v) => (v === '' ? undefined : v),
       z.string().min(16, { error: 'must be at least 16 characters' }).optional(),
     ),
 
-    // --- Caching ---
     /** Processed images kept in memory; 0 disables. */
     RESULT_CACHE_MAX_BYTES: nonNegativeInt.default(100 * MB),
     RESULT_CACHE_TTL_SECONDS: positiveInt.default(3600),
     /** Downloaded originals, so tweaking params doesn't re-download; 0 disables. */
     SOURCE_CACHE_MAX_BYTES: nonNegativeInt.default(50 * MB),
     SOURCE_CACHE_TTL_SECONDS: positiveInt.default(300),
-    /** Cache-Control max-age sent to browsers and CDNs. */
     HTTP_CACHE_MAX_AGE_SECONDS: nonNegativeInt.default(86_400),
   })
   .refine((c) => c.NODE_ENV !== 'production' || c.ALLOW_PRIVATE_ADDRESSES.length === 0, {
@@ -121,10 +100,7 @@ const configSchema = z
 
 export type Config = z.infer<typeof configSchema>;
 
-/**
- * Parses config from environment variables. Throws a readable error listing
- * every invalid variable so a misconfigured deploy fails fast at boot.
- */
+/** Parses env vars, failing fast with every invalid variable listed. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const result = configSchema.safeParse(env);
   if (!result.success) {

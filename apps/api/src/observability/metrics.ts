@@ -8,14 +8,7 @@ export interface JobStatsSource {
   readonly stats: { active: number; waiting: number };
 }
 
-/**
- * Prometheus metrics for one app instance. Each instance owns its registry,
- * so tests can build many apps without metrics leaking between them.
- *
- * Cache hit rate and error rate are derived in PromQL, e.g.
- *   sum(rate(ips_cache_lookups_total{result="hit"}[5m])) / sum(rate(ips_cache_lookups_total[5m]))
- *   sum(rate(http_requests_total{status_code=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))
- */
+/** One registry per app, so test apps don't share metrics. Hit and error rates come from PromQL. */
 export function createMetrics() {
   const registry = new Registry();
   collectDefaultMetrics({ register: registry });
@@ -32,7 +25,6 @@ export function createMetrics() {
     name: 'http_request_duration_seconds',
     help: 'Time to respond, by route template and method',
     labelNames: ['route', 'method'] as const,
-    // From cache hits (~1 ms) to cold video thumbnails (seconds).
     buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
     registers,
   });
@@ -76,7 +68,6 @@ export function createMetrics() {
     upstreamDuration,
     processingDuration,
 
-    /** Gauges sampled from live state each time /metrics is scraped. */
     trackState(caches: Record<string, CacheStatsSource>, limiter: JobStatsSource) {
       const cacheGauge = (name: string, help: string, pick: (s: CacheStatsSource) => number) =>
         new Gauge({

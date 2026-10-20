@@ -1,7 +1,4 @@
-/**
- * Every error code the API can return. Clients (and the SDK) can switch on
- * these; they are part of the public contract and must stay stable.
- */
+/** Public, stable error codes and their HTTP statuses. */
 export const ERROR_CODES = {
   INVALID_PARAMETER: 400,
   MISSING_PARAMETER: 400,

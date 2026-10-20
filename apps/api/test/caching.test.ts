@@ -8,7 +8,7 @@ import { makeFixtures } from './support/fixtures.js';
 let jpeg: Buffer;
 const SRC = 'https://images.example.com/photo.jpg';
 
-/** A fake upstream that counts calls, so we can see when the source is (re)fetched. */
+/** Counts calls, to see when the source is fetched again. */
 const upstream = vi.fn<(url: string) => Promise<FetchedSource>>();
 
 beforeAll(async () => {

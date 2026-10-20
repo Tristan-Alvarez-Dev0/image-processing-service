@@ -5,18 +5,16 @@ const fixture = (path: string) => `${process.env.FIXTURE_ORIGIN}${path}`;
 const original = (page: Page) => page.getByRole('region', { name: 'Original' });
 const processed = (page: Page) => page.getByRole('region', { name: 'Processed' });
 
-/** Waits until a panel has finished loading and shows an image. */
 async function expectImage(page: Page, panel: ReturnType<typeof original>) {
   await expect(panel).toHaveAttribute('aria-busy', 'false');
   await expect(panel.getByRole('img')).toBeVisible();
 }
 
-/** Presses the button that runs the request. */
 async function run(page: Page) {
   await page.getByRole('button', { name: /^(Process image|Get thumbnail)$/ }).click();
 }
 
-/** Picks an option in the (custom, non-native) format dropdown. */
+/** The format dropdown is custom, not a native <select>. */
 async function chooseFormat(page: Page, label: string) {
   await page.getByRole('combobox', { name: 'Format' }).click();
   await page.getByRole('option', { name: label }).click();
@@ -207,8 +205,7 @@ test('the button says what it will do', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Get thumbnail' })).toBeVisible();
 });
 
-// Common laptop screens (CSS pixels): the run button must be on screen
-// without scrolling, whatever the height.
+// Common laptop screens: the run button must be visible without scrolling.
 for (const [width, height] of [
   [1024, 640],
   [1280, 720],
@@ -232,7 +229,7 @@ for (const [width, height] of [
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThanOrEqual(height!);
 
-    // Nothing in the results column is squashed to fit: the request card shows its actions.
+    // Cards in the results column must not be squashed to fit.
     await expect(page.getByRole('button', { name: 'Copy URL' })).toBeVisible();
     const card = (await page.getByTestId('request-url').boundingBox())!;
     expect(card.height).toBeGreaterThan(20);
@@ -251,6 +248,7 @@ for (const [width, height] of [
 test('the controls scroll inside the card while the button stays put', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   const button = page.getByRole('button', { name: 'Process image' });
+  await expect(button).toBeInViewport();
   const before = (await button.boundingBox())!.y;
 
   await page.getByLabel('Grayscale').scrollIntoViewIfNeeded();

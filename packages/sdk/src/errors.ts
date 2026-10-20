@@ -1,4 +1,3 @@
-/** Error codes returned by the API. */
 export const API_ERROR_CODES = [
   'INVALID_PARAMETER',
   'MISSING_PARAMETER',
@@ -18,12 +17,7 @@ export const API_ERROR_CODES = [
 ] as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
-/**
- * Raised by the SDK itself, not the API:
- * - `NETWORK_ERROR`: the request never got a response (offline, DNS, CORS, ...)
- * - `TIMEOUT`: no response within `timeoutMs`
- * - `INVALID_RESPONSE`: an error response that isn't the API's JSON format (e.g. from a proxy)
- */
+/** Raised by the SDK itself: no response, a timeout, or a non-API error body (e.g. from a proxy). */
 export const CLIENT_ERROR_CODES = ['NETWORK_ERROR', 'TIMEOUT', 'INVALID_RESPONSE'] as const;
 export type ClientErrorCode = (typeof CLIENT_ERROR_CODES)[number];
 
@@ -40,7 +34,6 @@ export class ImageApiError extends Error {
   readonly code: ErrorCode;
   /** HTTP status; 0 when there was no response. */
   readonly status: number;
-  /** The query parameter at fault, when there is one. */
   readonly param: string | undefined;
   readonly details: ErrorDetail[] | undefined;
   readonly requestId: string | undefined;

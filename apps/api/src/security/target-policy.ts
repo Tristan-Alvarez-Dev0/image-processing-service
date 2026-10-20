@@ -10,7 +10,6 @@ export interface TargetPolicyOptions {
 
 const DEFAULT_PORTS: Record<string, number> = { 'http:': 80, 'https:': 443 };
 
-/** Raised from inside DNS resolution when a hostname points somewhere forbidden. */
 export class BlockedAddressError extends Error {
   constructor(
     readonly hostname: string,
@@ -23,13 +22,7 @@ export class BlockedAddressError extends Error {
 
 const forbidden = (message: string) => new AppError('FORBIDDEN_HOST', message);
 
-/**
- * Checks everything about a URL that can be checked without DNS: scheme,
- * credentials, port, and hosts that are IP literals or obviously local.
- * Runs for the original URL and again for every redirect hop.
- *
- * @param hop 0 for the URL the client sent, >0 for redirect targets
- */
+/** Checks what can be checked without DNS. Runs again on every redirect hop (`hop` > 0). */
 export function assertFetchableUrl(url: URL, policy: TargetPolicyOptions, hop = 0): void {
   const via = hop > 0 ? 'The source URL redirected to a URL that' : 'The url';
 
@@ -63,7 +56,7 @@ export function assertFetchableUrl(url: URL, policy: TargetPolicyOptions, hop = 
   }
 }
 
-/** Resolves a hostname to all of its addresses. Injectable for tests. */
+/** Injectable for tests. */
 export type Resolver = (
   hostname: string,
   family: number,
@@ -74,13 +67,8 @@ const systemResolver: Resolver = (hostname, family, callback) =>
   dnsLookup(hostname, { all: true, family }, callback);
 
 /**
- * A drop-in for dns.lookup that refuses to resolve to forbidden addresses.
- *
- * Plugged into the HTTP agent, it runs on the exact connection being opened,
- * so the address we validate is the address we connect to. That closes the
- * DNS-rebinding gap of "resolve, check, then let fetch resolve again".
- * If any resolved address is forbidden the whole lookup fails, rather than
- * hoping the client picks a safe one.
+ * dns.lookup that rejects forbidden addresses. It runs on the connection being
+ * opened, so the IP we check is the IP we connect to (no DNS rebinding).
  */
 export function createGuardedLookup(
   addresses: AddressPolicy,

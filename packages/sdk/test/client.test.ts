@@ -32,7 +32,6 @@ const errorResponse = (
     headers: { 'content-type': 'application/json', ...headers },
   });
 
-/** A client whose fetch answers with the given responses in turn. */
 function clientWith(responses: Array<Response | Error>, options: Record<string, unknown> = {}) {
   const fetch = vi.fn<typeof globalThis.fetch>();
   for (const r of responses) {

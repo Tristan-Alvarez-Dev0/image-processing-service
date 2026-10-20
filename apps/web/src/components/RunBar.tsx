@@ -5,15 +5,13 @@ import type { Mode } from '@/lib/playground';
 
 interface Props {
   mode: Mode;
-  /** No URL yet. */
   disabled: boolean;
   running: boolean;
-  /** The settings were edited after the last run. */
   dirty: boolean;
   onReset: () => void;
 }
 
-/** The only thing that calls the API: nothing is processed until this is pressed. */
+/** Nothing calls the API until this is pressed. */
 export function RunBar({ mode, disabled, running, dirty, onReset }: Props) {
   const label = mode === 'video' ? 'Get thumbnail' : 'Process image';
 

@@ -1,6 +1,7 @@
 import { CROP_MODES, type Format } from '@ips/sdk';
 import {
   Crop,
+  FileImage,
   Film,
   FlipHorizontal2,
   FlipVertical2,
@@ -9,7 +10,6 @@ import {
   RotateCcw,
   RotateCw,
   SlidersHorizontal,
-  Sparkles,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,6 @@ interface Props {
   form: FormState;
   onChange: (patch: Partial<FormState>) => void;
   onSample: (sample: Sample) => void;
-  /** Runs the request; also triggered by pressing Enter in any field. */
   onRun: () => void;
   /** The parameter the API rejected, to highlight its field. */
   errorParam: string | undefined;
@@ -74,7 +73,7 @@ function Section({
 }) {
   return (
     <section className="space-y-4">
-      <h3 className="flex items-center gap-2 text-xs font-medium tracking-wider text-muted-foreground uppercase">
+      <h3 className="flex items-center gap-2 text-sm font-medium text-foreground [&>svg]:text-muted-foreground">
         {icon}
         {title}
       </h3>
@@ -83,7 +82,7 @@ function Section({
   );
 }
 
-/** A labelled control. The small monospace tag shows the matching API parameter. */
+/** The monospace tag shows the matching API parameter. */
 function Field(props: {
   id: string;
   label: string;
@@ -173,7 +172,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
       }}
       aria-label="Transformation options"
     >
-      <Section title="What do you want to transform?" icon={<Sparkles className="size-3.5" />}>
+      <Section title="What do you want to transform?" icon={<FileImage className="size-4" />}>
         <Tabs
           value={form.mode}
           onValueChange={(mode) => onChange({ mode: mode as FormState['mode'] })}
@@ -251,7 +250,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
 
       <Separator />
 
-      <Section title="Size & fit" icon={<Crop className="size-3.5" />}>
+      <Section title="Size & fit" icon={<Crop className="size-4" />}>
         <div className="grid grid-cols-2 gap-3">
           {(['width', 'height'] as const).map((dim) => (
             <Field
@@ -312,7 +311,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
 
       <Separator />
 
-      <Section title="Format & quality" icon={<ImageIcon className="size-3.5" />}>
+      <Section title="Format & quality" icon={<ImageIcon className="size-4" />}>
         <Field
           id="f-format"
           label="Format"
@@ -364,7 +363,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
 
       <Separator />
 
-      <Section title="Adjustments" icon={<SlidersHorizontal className="size-3.5" />}>
+      <Section title="Adjustments" icon={<SlidersHorizontal className="size-4" />}>
         <Field id="f-rotate" label="Rotate" param="rotate" error={errorFor('rotate')}>
           <div className="flex gap-2">
             <Button

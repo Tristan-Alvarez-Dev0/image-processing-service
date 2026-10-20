@@ -9,11 +9,9 @@ export interface Loaded {
 }
 
 export interface PanelState {
-  /** A request is in flight for the current key. */
   loading: boolean;
-  /** The last successful image. Kept while the next one loads, to avoid flicker. */
+  /** Kept while the next one loads, to avoid flicker. */
   data: Loaded | undefined;
-  /** The error for the current key, if it failed. */
   error: unknown;
 }
 
@@ -23,10 +21,7 @@ interface Settled {
   error?: unknown;
 }
 
-/**
- * Loads the image for `request` whenever it changes (a new URL, or the same
- * URL run again), cancelling the previous request so stale responses never win.
- */
+/** Reloads on a new URL or run, cancelling the previous request so stale responses never win. */
 export function useImage(request: PanelRequest | undefined): PanelState {
   const [settled, setSettled] = useState<Settled>();
   const id = request ? `${request.run}:${request.key}` : undefined;

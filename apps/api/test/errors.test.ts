@@ -52,7 +52,6 @@ function processUrl(params: Record<string, string>) {
   return get(`/process?${new URLSearchParams(entries)}`);
 }
 
-/** Asserts the response follows the error contract and returns the error object. */
 function expectError(res: LightMyRequestResponse, status: number, code: ErrorCode) {
   expect(res.statusCode).toBe(status);
   expect(res.headers['content-type']).toMatch(/^application\/json/);

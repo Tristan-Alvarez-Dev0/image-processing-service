@@ -213,7 +213,6 @@ describe('blur', () => {
 });
 
 describe('grayscale', () => {
-  /** True when every pixel has R = G = B once decoded to RGB. */
   async function isGray(res: LightMyRequestResponse) {
     const { data } = await sharp(res.rawPayload)
       .toColourspace('srgb')
@@ -238,7 +237,7 @@ describe('grayscale', () => {
     const res = await get({ url: 'photo.jpg', grayscale: 'true', format, width: 100 });
 
     expect(res.statusCode).toBe(200);
-    // AVIF/WebP are lossy in chroma, so allow for that by checking the encoded colour space instead.
+    // AVIF and WebP are lossy in chroma, so R = G = B is only exact for the others.
     if (format === 'png' || format === 'jpeg' || format === 'gif') {
       expect(await isGray(res)).toBe(true);
     }

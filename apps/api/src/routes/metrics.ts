@@ -5,7 +5,6 @@ import { AppError } from '../errors/app-error.js';
 
 export interface MetricsRouteOptions {
   registry: Registry;
-  /** When set, scrapers must send `Authorization: Bearer <token>`. */
   token: string | undefined;
 }
 

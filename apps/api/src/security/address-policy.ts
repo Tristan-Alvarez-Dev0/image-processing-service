@@ -1,13 +1,8 @@
 import ipaddr from 'ipaddr.js';
 
 /**
- * Decides which IP addresses the service may connect to.
- *
- * Only globally routable unicast addresses are allowed. This blocks loopback,
- * RFC 1918 private ranges, link-local (incl. the 169.254.169.254 cloud metadata
- * endpoint), CGNAT, multicast, broadcast, reserved/documentation ranges, IPv6
- * unique-local, and IPv6 forms that embed an IPv4 address (mapped, NAT64,
- * 6to4, Teredo) which could otherwise smuggle a private IPv4 through.
+ * Allows only public unicast IPs. Blocks loopback, private, link-local (cloud
+ * metadata), CGNAT, reserved, and IPv6 forms that embed an IPv4 address.
  */
 export class AddressPolicy {
   private readonly exceptions: Set<string>;
