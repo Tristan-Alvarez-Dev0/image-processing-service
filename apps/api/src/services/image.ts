@@ -1,14 +1,23 @@
 import sharp, { type FitEnum, type Metadata, type Sharp } from 'sharp';
 import { AppError } from '../errors/app-error.js';
-import type { CropMode, OutputFormat } from '../schemas/process.js';
+import type { CropMode, FlipMode, OutputFormat, RequestedFormat } from '../schemas/process.js';
 import { OUTPUT_FORMATS } from '../schemas/process.js';
+import { chooseAutoFormat, type AcceptedFormats } from './format-negotiation.js';
 
 export interface TransformOptions {
   width?: number | undefined;
   height?: number | undefined;
-  format?: OutputFormat | undefined;
+  format?: RequestedFormat | undefined;
   quality: number;
   crop: CropMode;
+  /** Degrees clockwise, 0-359. Applied before resizing. */
+  rotate?: number | undefined;
+  flip?: FlipMode | undefined;
+  /** Gaussian blur sigma. */
+  blur?: number | undefined;
+  grayscale?: boolean | undefined;
+  /** What the client accepts; only used for format=auto. */
+  accept?: AcceptedFormats | undefined;
 }
 
 export interface ImageInfo {
@@ -37,15 +46,34 @@ const ANIMATED_FORMATS: ReadonlySet<OutputFormat> = new Set(['gif', 'webp']);
 const isOutputFormat = (f: string | undefined): f is OutputFormat =>
   (OUTPUT_FORMATS as readonly string[]).includes(f ?? '');
 
-/** Keep the source format when we can encode it; otherwise fall back to PNG (lossless, keeps alpha). */
-function resolveFormat(
-  requested: OutputFormat | undefined,
-  source: string | undefined,
-): OutputFormat {
+/**
+ * Explicit formats win. `auto` negotiates with the client. With no format,
+ * keep the source format when we can encode it, otherwise PNG (lossless, keeps alpha).
+ */
+function resolveFormat(opts: TransformOptions, meta: Metadata, frames: number): OutputFormat {
+  const requested = opts.format;
+  if (requested === 'auto') {
+    return chooseAutoFormat(opts.accept ?? { avif: false, webp: false }, {
+      hasAlpha: meta.hasAlpha ?? false,
+      animated: frames > 1,
+    });
+  }
   if (requested) return requested;
-  if (source === 'jpg') return 'jpeg';
-  if (source === 'heif') return 'avif';
-  return isOutputFormat(source) ? source : 'png';
+  if (meta.format === 'heif') return 'avif';
+  return isOutputFormat(meta.format) ? meta.format : 'png';
+}
+
+/** Transparent where the format supports it, white for JPEG. */
+const backgroundFor = (format: OutputFormat) =>
+  format === 'jpeg' ? { r: 255, g: 255, b: 255, alpha: 1 } : { r: 0, g: 0, b: 0, alpha: 0 };
+
+/** Bounding box of a w x h image rotated by `deg` degrees. */
+function rotatedSize(w: number, h: number, deg: number): [number, number] {
+  if (deg % 180 === 0) return [w, h];
+  if (deg % 90 === 0) return [h, w];
+  const rad = (deg * Math.PI) / 180;
+  const [cos, sin] = [Math.abs(Math.cos(rad)), Math.abs(Math.sin(rad))];
+  return [Math.ceil(w * cos + h * sin), Math.ceil(w * sin + h * cos)];
 }
 
 function encode(pipeline: Sharp, format: OutputFormat, quality: number): Sharp {
@@ -155,10 +183,29 @@ export async function transformImage(
     );
   }
 
-  const format = resolveFormat(opts.format, meta.format);
+  const format = resolveFormat(opts, meta, frames);
   const animated = frames > 1 && ANIMATED_FORMATS.has(format);
 
-  const outputPixels = estimateOutputPixels(srcW, srcH, opts) * (animated ? frames : 1);
+  // sharp treats an animation as one tall strip of frames: it cannot rotate it,
+  // and a vertical flip would also reverse the frame order.
+  if (animated && opts.rotate) {
+    throw new AppError(
+      'INVALID_PARAMETER',
+      'rotate is not supported for animated output; add format=jpeg or format=png to rotate the first frame',
+      'rotate',
+    );
+  }
+  if (animated && (opts.flip === 'vertical' || opts.flip === 'both')) {
+    throw new AppError(
+      'INVALID_PARAMETER',
+      `flip=${opts.flip} is not supported for animated output; use flip=horizontal, or add format=jpeg or format=png to flip the first frame`,
+      'flip',
+    );
+  }
+
+  // Rotation happens before resizing, so the resize works on the rotated canvas.
+  const [rotW, rotH] = rotatedSize(srcW, srcH, opts.rotate ?? 0);
+  const outputPixels = estimateOutputPixels(rotW, rotH, opts) * (animated ? frames : 1);
   if (outputPixels > limits.maxInputPixels) {
     const across = animated ? ` across ${frames} frames` : '';
     throw new AppError(
@@ -168,24 +215,32 @@ export async function transformImage(
     );
   }
 
-  // EXIF orientation is applied before resizing so width/height mean what the viewer sees.
+  // Order: orient (EXIF) -> flip -> rotate -> resize -> blur -> grayscale.
+  // Orienting and rotating first means width/height always describe the final image.
   let pipeline = sharp(input, { animated, limitInputPixels: limits.maxInputPixels })
     .timeout({ seconds: Math.max(1, Math.ceil(limits.timeoutMs / 1000)) })
     .autoOrient();
 
+  // sharp's flip() mirrors top/bottom and flop() mirrors left/right.
+  if (opts.flip === 'vertical' || opts.flip === 'both') pipeline = pipeline.flip();
+  if (opts.flip === 'horizontal' || opts.flip === 'both') pipeline = pipeline.flop();
+
+  if (opts.rotate) pipeline = pipeline.rotate(opts.rotate, { background: backgroundFor(format) });
+
   if (opts.width || opts.height) {
-    // Opaque formats can't hold transparent padding, so pad JPEGs with white.
-    const background =
-      format === 'jpeg' ? { r: 255, g: 255, b: 255, alpha: 1 } : { r: 0, g: 0, b: 0, alpha: 0 };
     pipeline = pipeline.resize({
       width: opts.width,
       height: opts.height,
       fit: FIT_BY_CROP[opts.crop],
       withoutEnlargement: opts.crop === 'limit',
-      background,
+      // Opaque formats can't hold transparent padding, so pad JPEGs with white.
+      background: backgroundFor(format),
     });
   }
 
+  if (opts.blur) pipeline = pipeline.blur(opts.blur);
+  // Store as a single channel where the format allows it: ~half the size for PNG.
+  if (opts.grayscale) pipeline = pipeline.greyscale().toColourspace('b-w');
   if (format === 'jpeg') pipeline = pipeline.flatten({ background: '#ffffff' });
 
   try {

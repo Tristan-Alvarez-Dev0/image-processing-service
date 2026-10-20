@@ -3,6 +3,7 @@ import { createProcessQuerySchema } from '../schemas/process.js';
 import { parseQuery } from '../schemas/validate.js';
 import type { LoadingCache } from '../services/cache.js';
 import type { SourceFetcher } from '../services/fetcher.js';
+import { parseAccept } from '../services/format-negotiation.js';
 import { cacheKey, etagFor, ifNoneMatchHits } from '../services/http-cache.js';
 import { transformImage, type ImageLimits, type TransformResult } from '../services/image.js';
 import type { ConcurrencyLimiter } from '../services/limiter.js';
@@ -23,8 +24,14 @@ export const processRoutes: FastifyPluginAsync<ProcessRouteOptions> = async (app
 
   app.get('/process', async (request, reply) => {
     const query = parseQuery(schema, request.query);
-    // Canonical URL form (lower-case host, default port dropped) for a better cache hit rate.
-    const params = { ...query, url: new URL(query.url).href };
+    const negotiated = query.format === 'auto';
+    const params = {
+      ...query,
+      // Canonical URL form (lower-case host, default port dropped) for a better cache hit rate.
+      url: new URL(query.url).href,
+      // Only format=auto depends on the Accept header, so only then is it part of the key.
+      accept: negotiated ? parseAccept(request.headers.accept) : undefined,
+    };
 
     const { value: result, hit } = await opts.resultCache.get(
       cacheKey('process', params),
@@ -37,6 +44,8 @@ export const processRoutes: FastifyPluginAsync<ProcessRouteOptions> = async (app
       },
     );
 
+    // Tell caches that the same URL yields different bytes per Accept header.
+    if (negotiated) reply.header('Vary', 'Accept');
     reply
       .header('Cache-Control', `public, max-age=${opts.httpMaxAgeSeconds}`)
       .header('ETag', result.etag)
