@@ -90,7 +90,7 @@ describe('error contract — 400 validation', () => {
   });
 
   it.each([
-    ['width', '0', /width must be a whole number >= 1/],
+    ['width', '0', /width must be a whole number from 1 to 4000/],
     ['width', 'abc', /width must be a whole number/],
     ['width', '-5', /width must be a whole number/],
     ['width', '12px', /width must be a whole number/],

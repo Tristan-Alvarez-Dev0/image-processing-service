@@ -12,6 +12,9 @@ export interface Route {
   body?: Buffer | string;
   /** Delay before responding, to simulate a slow upstream. */
   delayMs?: number;
+  headers?: Record<string, string>;
+  /** Send the body in two chunks without Content-Length. */
+  chunked?: boolean;
 }
 
 export interface FixtureServer {
@@ -39,10 +42,19 @@ export async function startFixtureServer(routes: Record<string, Route>): Promise
         res.writeHead(404).end('not found');
         return;
       }
+      const body = route.body ?? '';
       res.writeHead(route.status ?? 200, {
         'Content-Type': route.contentType ?? 'application/octet-stream',
+        ...(!route.chunked && { 'Content-Length': Buffer.byteLength(body) }),
+        ...route.headers,
       });
-      res.end(route.body ?? '');
+      if (route.chunked) {
+        const mid = Math.floor(body.length / 2);
+        res.write(body.slice(0, mid));
+        res.end(body.slice(mid));
+      } else {
+        res.end(body);
+      }
     };
     if (route?.delayMs) {
       const t = setTimeout(respond, route.delayMs);
