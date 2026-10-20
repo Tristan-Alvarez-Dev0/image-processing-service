@@ -39,5 +39,17 @@ export async function makeFixtures() {
     .gif({ loop: 0 })
     .toBuffer();
 
-  return { jpeg, png, rotatedJpeg, animatedGif, svg: gradient };
+  // 200x100 with a solid colour per quadrant, to check where pixels end up.
+  const quadrants = await sharp(
+    Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">
+        <rect width="100" height="50" fill="#ff0000"/><rect x="100" width="100" height="50" fill="#0000ff"/>
+        <rect y="50" width="100" height="50" fill="#00ff00"/><rect x="100" y="50" width="100" height="50" fill="#ffff00"/>
+      </svg>`,
+    ),
+  )
+    .png()
+    .toBuffer();
+
+  return { quadrants, jpeg, png, rotatedJpeg, animatedGif, svg: gradient };
 }

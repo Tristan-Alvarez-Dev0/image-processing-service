@@ -99,7 +99,7 @@ describe('error contract — 400 validation', () => {
     ['height', '1.5', /height must be a whole number/],
     ['quality', '0', /quality must be a whole number from 1 to 100/],
     ['quality', '101', /quality must be a whole number from 1 to 100/],
-    ['format', 'bmp', /format must be one of: jpeg, png, webp, avif, gif, jpg/],
+    ['format', 'bmp', /format must be one of: jpeg, png, webp, avif, gif, auto, jpg/],
     ['crop', 'zoom', /crop must be one of: fill, fit, limit, pad, scale/],
   ])('INVALID_PARAMETER for %s=%s', async (param, value, message) => {
     const err = expectError(
@@ -121,7 +121,7 @@ describe('error contract — 400 validation', () => {
 
     expect(err.param).toBe('widht');
     expect(err.message).toBe(
-      "Unknown parameter 'widht'. Supported parameters: url, width, height, format, quality, crop",
+      "Unknown parameter 'widht'. Supported parameters: url, width, height, format, quality, crop, rotate, flip, blur, grayscale",
     );
   });
 
