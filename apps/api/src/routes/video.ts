@@ -5,9 +5,10 @@ import type { LoadingCache } from '../services/cache.js';
 import type { SourceFetcher } from '../services/fetcher.js';
 import { parseAccept } from '../services/format-negotiation.js';
 import { cacheKey, etagFor } from '../services/http-cache.js';
-import { transformImage, type ImageLimits } from '../services/image.js';
+import { transformImage, type ImageLimits, type TransformResult } from '../services/image.js';
 import type { ConcurrencyLimiter } from '../services/limiter.js';
-import { extractFrame, type VideoLimits } from '../services/video.js';
+import type { Metrics } from '../observability/metrics.js';
+import { extractFrame, type ExtractedFrame, type VideoLimits } from '../services/video.js';
 import { sendImage, type ProcessedImage } from './image-response.js';
 
 export interface VideoRouteOptions {
@@ -21,6 +22,7 @@ export interface VideoRouteOptions {
   httpMaxAgeSeconds: number;
   /** Per-route rate limit, stricter than the global one (null when rate limiting is off). */
   rateLimit: { max: number; timeWindow: number } | null;
+  metrics: Metrics;
 }
 
 export const videoRoutes: FastifyPluginAsync<VideoRouteOptions> = async (app, opts) => {
@@ -44,8 +46,15 @@ export const videoRoutes: FastifyPluginAsync<VideoRouteOptions> = async (app, op
         // Videos skip the source cache: they are large, and results are cached anyway.
         const source = await opts.fetchSource(params.url, { maxBytes: opts.maxSourceBytes });
         return opts.limiter.run(async () => {
-          const frame = await extractFrame(source.body, params.time, opts.videoLimits);
-          const transformed = await transformImage(frame.png, params, opts.imageLimits);
+          const end = opts.metrics.processingDuration.startTimer({ kind: 'video' });
+          let frame: ExtractedFrame;
+          let transformed: TransformResult;
+          try {
+            frame = await extractFrame(source.body, params.time, opts.videoLimits);
+            transformed = await transformImage(frame.png, params, opts.imageLimits);
+          } finally {
+            end();
+          }
           const extraHeaders: Record<string, string> = {};
           if (frame.durationSeconds !== undefined) {
             extraHeaders['X-Original-Duration'] = frame.durationSeconds.toFixed(3);

@@ -86,6 +86,13 @@ const configSchema = z
     /** Stricter budget for /video/thumbnail, which downloads and decodes video. */
     VIDEO_RATE_LIMIT_MAX: positiveInt.default(10),
 
+    // --- Observability ---
+    /** Protects /metrics with a bearer token when set (16+ characters). */
+    METRICS_TOKEN: z.preprocess(
+      (v) => (v === '' ? undefined : v),
+      z.string().min(16, { error: 'must be at least 16 characters' }).optional(),
+    ),
+
     // --- Caching ---
     /** Processed images kept in memory; 0 disables. */
     RESULT_CACHE_MAX_BYTES: nonNegativeInt.default(100 * MB),

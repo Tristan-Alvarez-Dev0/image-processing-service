@@ -12,6 +12,7 @@ export interface ErrorBody {
 }
 
 function send(reply: FastifyReply, request: FastifyRequest, err: AppError) {
+  request.errorCode = err.code;
   const body: ErrorBody = {
     error: {
       code: err.code,
@@ -42,10 +43,8 @@ function fromFastifyError(err: FastifyError): AppError | undefined {
 export function registerErrorHandling(app: FastifyInstance) {
   app.setErrorHandler<FastifyError>((err, request, reply) => {
     const appError = err instanceof AppError ? err : fromFastifyError(err);
-    if (appError) {
-      request.log.info({ code: appError.code, msg: appError.message }, 'request failed');
-      return send(reply, request, appError);
-    }
+    // Expected errors are reported in the per-request log line (see request-hooks).
+    if (appError) return send(reply, request, appError);
 
     request.log.error({ err }, 'unhandled error');
     return send(

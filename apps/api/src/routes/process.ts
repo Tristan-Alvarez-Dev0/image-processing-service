@@ -7,6 +7,7 @@ import { parseAccept } from '../services/format-negotiation.js';
 import { cacheKey, etagFor } from '../services/http-cache.js';
 import { transformImage, type ImageLimits } from '../services/image.js';
 import type { ConcurrencyLimiter } from '../services/limiter.js';
+import type { Metrics } from '../observability/metrics.js';
 import { sendImage, type ProcessedImage } from './image-response.js';
 
 export interface ProcessRouteOptions {
@@ -16,6 +17,7 @@ export interface ProcessRouteOptions {
   maxDimension: number;
   imageLimits: ImageLimits;
   httpMaxAgeSeconds: number;
+  metrics: Metrics;
 }
 
 export const processRoutes: FastifyPluginAsync<ProcessRouteOptions> = async (app, opts) => {
@@ -34,9 +36,15 @@ export const processRoutes: FastifyPluginAsync<ProcessRouteOptions> = async (app
 
     const { value, hit } = await opts.resultCache.get(cacheKey('process', params), async () => {
       const source = await opts.fetchSource(params.url);
-      const transformed = await opts.limiter.run(() =>
-        transformImage(source.body, params, opts.imageLimits, source.contentType),
-      );
+      const transformed = await opts.limiter.run(async () => {
+        // Timed inside the limiter, so queueing time isn't counted as processing.
+        const end = opts.metrics.processingDuration.startTimer({ kind: 'image' });
+        try {
+          return await transformImage(source.body, params, opts.imageLimits, source.contentType);
+        } finally {
+          end();
+        }
+      });
       return { ...transformed, etag: etagFor(transformed.data) };
     });
 
