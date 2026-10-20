@@ -40,23 +40,39 @@ const oneOf = <T extends readonly [string, ...string[]]>(name: string, values: T
     error: `${name} must be one of: ${[...values, extra].filter(Boolean).join(', ')}`,
   });
 
-export const processQuerySchema = z
-  .object({
-    url: z.url({
-      protocol: /^https?$/,
-      error: 'url must be an absolute http:// or https:// URL (remember to URL-encode it)',
-    }),
-    width: integer('width', 1).optional(),
-    height: integer('height', 1).optional(),
-    format: z
-      .preprocess(
-        (v) => (typeof v === 'string' ? (FORMAT_ALIASES[v.toLowerCase()] ?? v.toLowerCase()) : v),
-        oneOf('format', OUTPUT_FORMATS, 'jpg'),
-      )
-      .optional(),
-    quality: integer('quality', 1, 100).default(80),
-    crop: oneOf('crop', CROP_MODES).default('fill'),
-  })
-  .strict();
+/** Long enough for real CDN URLs with signed query strings; stops abuse via giant URLs. */
+export const MAX_URL_LENGTH = 2048;
 
-export type ProcessQuery = z.infer<typeof processQuerySchema>;
+export interface ProcessLimits {
+  maxDimension: number;
+}
+
+export const sourceUrl = () =>
+  z
+    .string()
+    .max(MAX_URL_LENGTH, { error: `url must be at most ${MAX_URL_LENGTH} characters` })
+    .pipe(
+      z.url({
+        protocol: /^https?$/,
+        error: 'url must be an absolute http:// or https:// URL (remember to URL-encode it)',
+      }),
+    );
+
+export const createProcessQuerySchema = ({ maxDimension }: ProcessLimits) =>
+  z
+    .object({
+      url: sourceUrl(),
+      width: integer('width', 1, maxDimension).optional(),
+      height: integer('height', 1, maxDimension).optional(),
+      format: z
+        .preprocess(
+          (v) => (typeof v === 'string' ? (FORMAT_ALIASES[v.toLowerCase()] ?? v.toLowerCase()) : v),
+          oneOf('format', OUTPUT_FORMATS, 'jpg'),
+        )
+        .optional(),
+      quality: integer('quality', 1, 100).default(80),
+      crop: oneOf('crop', CROP_MODES).default('fill'),
+    })
+    .strict();
+
+export type ProcessQuery = z.infer<ReturnType<typeof createProcessQuerySchema>>;

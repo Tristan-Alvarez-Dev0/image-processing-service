@@ -44,6 +44,7 @@ function resolveFormat(
 ): OutputFormat {
   if (requested) return requested;
   if (source === 'jpg') return 'jpeg';
+  if (source === 'heif') return 'avif';
   return isOutputFormat(source) ? source : 'png';
 }
 
@@ -86,18 +87,91 @@ async function readMetadata(input: Buffer, contentType: string | undefined): Pro
   }
 }
 
+/** Detected from the file's bytes, never from the URL or Content-Type. `heif` covers AVIF. */
+export const SUPPORTED_INPUT_FORMATS: ReadonlySet<string> = new Set([
+  'jpeg',
+  'png',
+  'webp',
+  'gif',
+  'heif',
+  'tiff',
+  'svg',
+]);
+
+export interface ImageLimits {
+  /** Max decoded pixels across all frames (decompression-bomb guard). */
+  maxInputPixels: number;
+  timeoutMs: number;
+}
+
+const megapixels = (px: number) =>
+  px >= 1_000_000 ? `${Math.round(px / 100_000) / 10} MP` : `${px.toLocaleString('en-US')} pixels`;
+
+/** Upper bound of the output size in pixels for a single frame. */
+function estimateOutputPixels(srcW: number, srcH: number, opts: TransformOptions): number {
+  const clampW = (w: number) => (opts.crop === 'limit' ? Math.min(w, srcW) : w);
+  const clampH = (h: number) => (opts.crop === 'limit' ? Math.min(h, srcH) : h);
+  if (opts.width && opts.height) return clampW(opts.width) * clampH(opts.height);
+  if (opts.width) {
+    const w = clampW(opts.width);
+    return w * Math.max(1, Math.round((w * srcH) / srcW));
+  }
+  if (opts.height) {
+    const h = clampH(opts.height);
+    return h * Math.max(1, Math.round((h * srcW) / srcH));
+  }
+  return srcW * srcH;
+}
+
 export async function transformImage(
   input: Buffer,
   opts: TransformOptions,
+  limits: ImageLimits,
   contentType?: string,
 ): Promise<TransformResult> {
   const meta = await readMetadata(input, contentType);
 
+  if (!meta.format || !SUPPORTED_INPUT_FORMATS.has(meta.format)) {
+    throw new AppError(
+      'UNSUPPORTED_MEDIA_TYPE',
+      `Source format '${meta.format ?? 'unknown'}' is not supported. Supported: JPEG, PNG, WebP, GIF, AVIF, TIFF, SVG`,
+    );
+  }
+
+  // Orientations 5-8 rotate by 90deg, so the visible width/height are swapped.
+  const rotated = (meta.orientation ?? 1) >= 5;
+  const frameHeight = meta.pageHeight ?? meta.height ?? 0;
+  const srcW = (rotated ? frameHeight : meta.width) ?? 0;
+  const srcH = (rotated ? meta.width : frameHeight) ?? 0;
+  const frames = meta.pages ?? 1;
+
+  // Checked from the header, before decoding a single pixel.
+  const inputPixels = srcW * srcH * frames;
+  if (inputPixels > limits.maxInputPixels) {
+    const across = frames > 1 ? ` across ${frames} frames` : '';
+    throw new AppError(
+      'SOURCE_TOO_LARGE',
+      `The source image is ${srcW}x${srcH}${across} (${megapixels(inputPixels)}); the limit is ${megapixels(limits.maxInputPixels)}`,
+    );
+  }
+
   const format = resolveFormat(opts.format, meta.format);
-  const animated = (meta.pages ?? 1) > 1 && ANIMATED_FORMATS.has(format);
+  const animated = frames > 1 && ANIMATED_FORMATS.has(format);
+
+  const outputPixels = estimateOutputPixels(srcW, srcH, opts) * (animated ? frames : 1);
+  if (outputPixels > limits.maxInputPixels) {
+    const across = animated ? ` across ${frames} frames` : '';
+    throw new AppError(
+      'INVALID_PARAMETER',
+      `The output would be about ${megapixels(outputPixels)}${across}; the limit is ${megapixels(limits.maxInputPixels)}. Request a smaller width or height`,
+      opts.width ? 'width' : 'height',
+    );
+  }
 
   // EXIF orientation is applied before resizing so width/height mean what the viewer sees.
-  let pipeline = sharp(input, { animated }).autoOrient();
+  let pipeline = sharp(input, { animated, limitInputPixels: limits.maxInputPixels })
+    .timeout({ seconds: Math.max(1, Math.ceil(limits.timeoutMs / 1000)) })
+    .autoOrient();
 
   if (opts.width || opts.height) {
     // Opaque formats can't hold transparent padding, so pad JPEGs with white.
@@ -118,9 +192,6 @@ export async function transformImage(
     const { data, info } = await encode(pipeline, format, opts.quality).toBuffer({
       resolveWithObject: true,
     });
-    // Orientations 5-8 rotate by 90deg, so the visible width/height are swapped.
-    const autoOriented = (meta.orientation ?? 1) >= 5;
-    const sourceHeight = meta.pageHeight ?? meta.height;
     return {
       data,
       output: {
@@ -130,14 +201,15 @@ export async function transformImage(
         height: info.pageHeight ?? info.height,
         size: data.length,
       },
-      original: {
-        format: meta.format ?? 'unknown',
-        width: (autoOriented ? sourceHeight : meta.width) ?? 0,
-        height: (autoOriented ? meta.width : sourceHeight) ?? 0,
-        size: input.length,
-      },
+      original: { format: meta.format, width: srcW, height: srcH, size: input.length },
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && /timeout/i.test(err.message)) {
+      throw new AppError(
+        'UNPROCESSABLE_IMAGE',
+        `The image took longer than ${limits.timeoutMs / 1000}s to process; try a smaller output size`,
+      );
+    }
     throw new AppError(
       'UNPROCESSABLE_IMAGE',
       'The source image could not be processed; it may be corrupt or truncated',

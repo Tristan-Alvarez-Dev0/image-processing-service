@@ -4,7 +4,9 @@ import type { Config } from './config.js';
 import { registerErrorHandling } from './errors/error-handler.js';
 import { healthRoutes } from './routes/health.js';
 import { processRoutes } from './routes/process.js';
+import { AddressPolicy } from './security/address-policy.js';
 import { createFetcher, type SourceFetcher } from './services/fetcher.js';
+import { ConcurrencyLimiter } from './services/limiter.js';
 
 /** Collaborators that tests can swap out. */
 export interface AppDeps {
@@ -38,15 +40,30 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
 
   registerErrorHandling(app);
 
-  const fetchSource =
-    deps.fetchSource ??
-    createFetcher({
+  let fetchSource = deps.fetchSource;
+  if (!fetchSource) {
+    const fetcher = createFetcher({
       timeoutMs: config.FETCH_TIMEOUT_MS,
+      maxBytes: config.MAX_SOURCE_BYTES,
+      maxRedirects: config.MAX_REDIRECTS,
+      addresses: new AddressPolicy(config.ALLOW_PRIVATE_ADDRESSES),
+      allowedPorts: config.ALLOWED_PORTS,
       userAgent: `ImageProcessingService/${config.APP_VERSION}`,
     });
+    app.addHook('onClose', fetcher.close);
+    fetchSource = fetcher.fetch;
+  }
 
   await app.register(healthRoutes, { version: config.APP_VERSION });
-  await app.register(processRoutes, { fetchSource });
+  await app.register(processRoutes, {
+    fetchSource,
+    limiter: new ConcurrencyLimiter(config.MAX_CONCURRENT_JOBS),
+    maxDimension: config.MAX_OUTPUT_DIMENSION,
+    imageLimits: {
+      maxInputPixels: config.MAX_INPUT_PIXELS,
+      timeoutMs: config.PROCESSING_TIMEOUT_MS,
+    },
+  });
 
   return app;
 }

@@ -1,19 +1,27 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { processQuerySchema } from '../schemas/process.js';
+import { createProcessQuerySchema } from '../schemas/process.js';
 import { parseQuery } from '../schemas/validate.js';
 import type { SourceFetcher } from '../services/fetcher.js';
-import { transformImage } from '../services/image.js';
+import { transformImage, type ImageLimits } from '../services/image.js';
+import type { ConcurrencyLimiter } from '../services/limiter.js';
 
 export interface ProcessRouteOptions {
   fetchSource: SourceFetcher;
+  limiter: ConcurrencyLimiter;
+  maxDimension: number;
+  imageLimits: ImageLimits;
 }
 
 export const processRoutes: FastifyPluginAsync<ProcessRouteOptions> = async (app, opts) => {
+  const schema = createProcessQuerySchema({ maxDimension: opts.maxDimension });
+
   app.get('/process', async (request, reply) => {
-    const query = parseQuery(processQuerySchema, request.query);
+    const query = parseQuery(schema, request.query);
 
     const source = await opts.fetchSource(query.url);
-    const result = await transformImage(source.body, query, source.contentType);
+    const result = await opts.limiter.run(() =>
+      transformImage(source.body, query, opts.imageLimits, source.contentType),
+    );
 
     return reply
       .header('Content-Type', `image/${result.output.format}`)

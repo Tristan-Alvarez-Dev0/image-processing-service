@@ -1,4 +1,12 @@
+import { Agent, request, type Dispatcher } from 'undici';
 import { AppError } from '../errors/app-error.js';
+import type { AddressPolicy } from '../security/address-policy.js';
+import {
+  assertFetchableUrl,
+  BlockedAddressError,
+  createGuardedLookup,
+  type Resolver,
+} from '../security/target-policy.js';
 
 export interface FetchedSource {
   body: Buffer;
@@ -6,69 +14,186 @@ export interface FetchedSource {
 }
 
 export interface FetchOptions {
+  /** Total budget for the whole fetch, including redirects and body download. */
   timeoutMs: number;
+  maxBytes: number;
+  maxRedirects: number;
+  addresses: AddressPolicy;
+  allowedPorts: ReadonlySet<number> | '*';
   /** Many hosts (e.g. Wikimedia) reject requests without a User-Agent. */
   userAgent: string;
+  /** Override DNS resolution (tests only). */
+  resolve?: Resolver;
 }
 
 export type SourceFetcher = (url: string) => Promise<FetchedSource>;
 
-/**
- * Downloads a remote resource into memory.
- */
+export interface Fetcher {
+  fetch: SourceFetcher;
+  close: () => Promise<void>;
+}
+
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
 const NETWORK_ERRORS: Record<string, string> = {
   ENOTFOUND: 'Could not resolve the host name of the source URL',
   EAI_AGAIN: 'Could not resolve the host name of the source URL',
   ECONNREFUSED: 'The source host refused the connection',
   ECONNRESET: 'The source host closed the connection unexpectedly',
   EHOSTUNREACH: 'The source host is unreachable',
+  UND_ERR_CONNECT_TIMEOUT: 'Timed out connecting to the source host',
+  UND_ERR_SOCKET: 'The source host closed the connection unexpectedly',
   CERT_HAS_EXPIRED: 'The source host has an expired TLS certificate',
   DEPTH_ZERO_SELF_SIGNED_CERT: 'The source host has a self-signed TLS certificate',
+  ERR_TLS_CERT_ALTNAME_INVALID: 'The TLS certificate of the source host does not match its name',
 };
 
-function networkErrorMessage(err: unknown): string {
-  const code = (err as { cause?: { code?: string } })?.cause?.code;
-  return (code && NETWORK_ERRORS[code]) ?? 'Could not connect to the source URL';
+const formatBytes = (n: number) =>
+  n >= 1024 * 1024 ? `${Math.round((n / 1024 / 1024) * 10) / 10} MB` : `${Math.ceil(n / 1024)} KB`;
+
+/** Walks an error and its `cause` chain looking for something we recognise. */
+function findCause<T>(err: unknown, pick: (e: unknown) => T | undefined): T | undefined {
+  for (let e = err, depth = 0; e && depth < 5; e = (e as { cause?: unknown }).cause, depth++) {
+    const hit = pick(e);
+    if (hit !== undefined) return hit;
+  }
+  return undefined;
 }
 
-export function createFetcher(opts: FetchOptions): SourceFetcher {
-  return async (url) => {
-    let res: Response;
-    try {
-      res = await fetch(url, {
-        headers: { 'User-Agent': opts.userAgent, Accept: 'image/*,*/*;q=0.8' },
-        signal: AbortSignal.timeout(opts.timeoutMs),
-      });
-    } catch (err) {
-      if (err instanceof Error && err.name === 'TimeoutError') {
-        throw new AppError(
-          'UPSTREAM_TIMEOUT',
-          `The source URL did not respond within ${opts.timeoutMs / 1000}s`,
-        );
-      }
-      throw new AppError('UPSTREAM_ERROR', networkErrorMessage(err));
-    }
+function toAppError(err: unknown, timedOut: boolean, timeoutMs: number): AppError {
+  if (err instanceof AppError) return err;
 
-    if (res.status === 404 || res.status === 410) {
-      throw new AppError('SOURCE_NOT_FOUND', `The source URL returned HTTP ${res.status}`);
+  const blocked = findCause(err, (e) => (e instanceof BlockedAddressError ? e : undefined));
+  if (blocked) {
+    return new AppError(
+      'FORBIDDEN_HOST',
+      `The source host ${blocked.hostname} resolves to a private or reserved IP address, which is not allowed`,
+    );
+  }
+
+  if (timedOut) {
+    return new AppError(
+      'UPSTREAM_TIMEOUT',
+      `The source URL did not respond within ${timeoutMs / 1000}s`,
+    );
+  }
+
+  const code = findCause(err, (e) => {
+    const c = (e as { code?: unknown }).code;
+    return typeof c === 'string' && c in NETWORK_ERRORS ? c : undefined;
+  });
+  return new AppError(
+    'UPSTREAM_ERROR',
+    (code && NETWORK_ERRORS[code]) ?? 'Could not connect to the source URL',
+  );
+}
+
+type Body = Dispatcher.ResponseData['body'];
+
+/**
+ * Abandons a response body. undici emits an AbortError on destroy, and an
+ * unhandled 'error' event would crash the process, so swallow it here.
+ */
+function discard(body: Body): void {
+  body.on('error', () => {});
+  body.destroy();
+}
+
+async function readLimited(body: Body, maxBytes: number) {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of body) {
+    size += (chunk as Buffer).length;
+    if (size > maxBytes) {
+      discard(body);
+      throw new AppError(
+        'SOURCE_TOO_LARGE',
+        `The source is larger than the ${formatBytes(maxBytes)} limit`,
+      );
     }
-    if (!res.ok) {
-      throw new AppError('UPSTREAM_ERROR', `The source URL returned HTTP ${res.status}`);
-    }
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks, size);
+}
+
+/**
+ * Fetches untrusted URLs safely:
+ * - every hop (original URL and each redirect) passes `assertFetchableUrl`
+ * - DNS answers are checked on the connection itself (no rebinding window)
+ * - redirects are followed manually, up to `maxRedirects`
+ * - one deadline covers connect, redirects and download
+ * - the body is streamed and abandoned as soon as it exceeds `maxBytes`
+ */
+export function createFetcher(opts: FetchOptions): Fetcher {
+  const agent = new Agent({
+    connect: {
+      lookup: createGuardedLookup(opts.addresses, opts.resolve),
+      timeout: opts.timeoutMs,
+    },
+    keepAliveTimeout: 10_000,
+  });
+  const policy = { addresses: opts.addresses, allowedPorts: opts.allowedPorts };
+
+  const fetchSource: SourceFetcher = async (rawUrl) => {
+    const signal = AbortSignal.timeout(opts.timeoutMs);
+    let url = new URL(rawUrl);
 
     try {
-      return {
-        body: Buffer.from(await res.arrayBuffer()),
-        contentType: res.headers.get('content-type') ?? undefined,
-      };
-    } catch (err) {
-      if (err instanceof Error && err.name === 'TimeoutError') {
-        throw new AppError(
-          'UPSTREAM_TIMEOUT',
-          `The source URL did not finish sending within ${opts.timeoutMs / 1000}s`,
-        );
+      for (let hop = 0; ; hop++) {
+        assertFetchableUrl(url, policy, hop);
+
+        const res = await request(url, {
+          dispatcher: agent,
+          method: 'GET',
+          headers: { 'user-agent': opts.userAgent, accept: 'image/*,*/*;q=0.8' },
+          signal,
+        });
+
+        if (REDIRECT_STATUSES.has(res.statusCode)) {
+          await res.body.dump();
+          const location = res.headers.location;
+          if (typeof location !== 'string' || !location) {
+            throw new AppError('UPSTREAM_ERROR', 'The source URL redirected without a Location');
+          }
+          if (hop >= opts.maxRedirects) {
+            throw new AppError(
+              'UPSTREAM_ERROR',
+              `The source URL redirected more than ${opts.maxRedirects} times`,
+            );
+          }
+          url = new URL(location, url);
+          continue;
+        }
+
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          await res.body.dump();
+          const code =
+            res.statusCode === 404 || res.statusCode === 410
+              ? 'SOURCE_NOT_FOUND'
+              : 'UPSTREAM_ERROR';
+          throw new AppError(code, `The source URL returned HTTP ${res.statusCode}`);
+        }
+
+        // Fail fast on an honest Content-Length; readLimited catches dishonest ones.
+        const declared = Number(res.headers['content-length']);
+        if (Number.isFinite(declared) && declared > opts.maxBytes) {
+          discard(res.body);
+          throw new AppError(
+            'SOURCE_TOO_LARGE',
+            `The source is ${formatBytes(declared)}, over the ${formatBytes(opts.maxBytes)} limit`,
+          );
+        }
+
+        const contentType = res.headers['content-type'];
+        return {
+          body: await readLimited(res.body, opts.maxBytes),
+          contentType: typeof contentType === 'string' ? contentType : undefined,
+        };
       }
-      throw new AppError('UPSTREAM_ERROR', 'The connection to the source URL was interrupted');
+    } catch (err) {
+      throw toAppError(err, signal.aborted, opts.timeoutMs);
     }
   };
+
+  return { fetch: fetchSource, close: () => agent.close() };
 }
