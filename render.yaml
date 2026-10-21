@@ -19,9 +19,10 @@ services:
         - .dockerignore
         - render.yaml
     envVars:
-      # Render's proxy appends to X-Forwarded-For; trust only that one hop.
+      # Measured live: client -> Cloudflare -> Render load balancer -> local proxy -> app.
+      # Trusting exactly those 3 hops gives the real client IP and ignores spoofed values.
       - key: TRUST_PROXY
-        value: '1'
+        value: '3'
       - key: METRICS_TOKEN
         generateValue: true
       # Sized for the free instance (512 MB RAM, a fraction of a CPU).

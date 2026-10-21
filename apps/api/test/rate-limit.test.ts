@@ -82,6 +82,29 @@ describe('rate limiting', () => {
     expect((await viaProxy('2.2.2.2', '198.51.100.8')).statusCode).toBe(200);
   });
 
+  it("finds the real client behind Render's three proxies (chain measured live)", async () => {
+    app = await buildTestApp({ RATE_LIMIT_MAX: '1', TRUST_PROXY: '3' }, { fetchSource });
+    // What the app received on Render: spoofed value, client, Cloudflare, Render LB;
+    // the connection itself comes from a local proxy on 127.0.0.1.
+    const viaRender = (spoofed: string, client: string, edge: string, lb: string) =>
+      hit({
+        ip: '127.0.0.1',
+        headers: { 'x-forwarded-for': `${spoofed},${client}, ${edge}, ${lb}` },
+      });
+
+    expect(
+      (await viaRender('1.1.1.1', '54.242.141.161', '172.70.135.69', '10.27.0.14')).statusCode,
+    ).toBe(200);
+    // Same client through a different edge and load balancer, with a new spoofed value: still limited.
+    expect(
+      (await viaRender('9.9.9.9', '54.242.141.161', '104.22.104.151', '10.26.16.133')).statusCode,
+    ).toBe(429);
+    // A different client is counted separately.
+    expect(
+      (await viaRender('9.9.9.9', '203.0.113.50', '172.70.34.83', '10.26.16.133')).statusCode,
+    ).toBe(200);
+  });
+
   it('never limits /health', async () => {
     app = await buildTestApp({ RATE_LIMIT_MAX: '1' }, { fetchSource });
     await hit();
