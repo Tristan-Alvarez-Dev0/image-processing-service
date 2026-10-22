@@ -7,7 +7,6 @@ import {
   OUTPUT_FORMATS,
 } from '../schemas/process.js';
 
-/** From the running config, so the docs never go stale. */
 export interface DocumentedLimits {
   version: string;
   maxDimension: number;
@@ -24,8 +23,8 @@ export interface DocumentedLimits {
   httpMaxAgeSeconds: number;
 }
 
-const mb = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
-const mp = (px: number) => `${Math.round(px / 1_000_000)} MP`;
+const formatMb = (bytes: number) => `${Math.round(bytes / 1024 / 1024)} MB`;
+const formatMp = (px: number) => `${Math.round(px / 1_000_000)} MP`;
 
 type Schema = Record<string, unknown>;
 type Parameter = {
@@ -238,8 +237,8 @@ and the offending \`param\` when there is one:
 | Limit | Value |
 |---|---|
 | Output width/height | ${l.maxDimension} px |
-| Decoded pixels (input and output, all frames) | ${mp(l.maxInputPixels)} |
-| Source size | ${mb(l.maxSourceBytes)} (videos: ${mb(l.videoMaxSourceBytes)}) |
+| Decoded pixels (input and output, all frames) | ${formatMp(l.maxInputPixels)} |
+| Source size | ${formatMb(l.maxSourceBytes)} (videos: ${formatMb(l.videoMaxSourceBytes)}) |
 | Fetch time (including redirects) | ${l.fetchTimeoutMs / 1000} s (videos: ${l.videoFetchTimeoutMs / 1000} s) |
 | Redirects | ${l.maxRedirects} |
 | Processing time | ${l.processingTimeoutMs / 1000} s |

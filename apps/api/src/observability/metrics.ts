@@ -8,7 +8,7 @@ export interface JobStatsSource {
   readonly stats: { active: number; waiting: number };
 }
 
-/** One registry per app, so test apps don't share metrics. Hit and error rates come from PromQL. */
+/** One registry per app, so test apps don't share metrics. */
 export function createMetrics() {
   const registry = new Registry();
   collectDefaultMetrics({ register: registry });

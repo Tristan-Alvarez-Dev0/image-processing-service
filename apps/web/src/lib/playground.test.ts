@@ -64,9 +64,9 @@ describe('prepareRequest', () => {
     );
   });
 
-  it('flags format=auto as negotiated', () => {
-    expect(prepareRequest({ ...DEFAULT_FORM, url: SRC, format: 'auto' })!.negotiated).toBe(true);
-    expect(prepareRequest({ ...DEFAULT_FORM, url: SRC, format: 'png' })!.negotiated).toBe(false);
+  it('flags format=auto', () => {
+    expect(prepareRequest({ ...DEFAULT_FORM, url: SRC, format: 'auto' })!.isAuto).toBe(true);
+    expect(prepareRequest({ ...DEFAULT_FORM, url: SRC, format: 'png' })!.isAuto).toBe(false);
   });
 });
 

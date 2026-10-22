@@ -25,13 +25,13 @@ export const processRoutes: FastifyPluginAsync<ProcessRouteOptions> = async (app
 
   app.get('/process', async (request, reply) => {
     const query = parseQuery(schema, request.query);
-    const negotiated = query.format === 'auto';
+    const isAuto = query.format === 'auto';
     const params = {
       ...query,
       // Canonical form (lower-case host, no default port) for better cache hits.
       url: new URL(query.url).href,
       // Only format=auto depends on the Accept header, so only then is it part of the key.
-      accept: negotiated ? parseAccept(request.headers.accept) : undefined,
+      accept: isAuto ? parseAccept(request.headers.accept) : undefined,
     };
 
     const { value, hit } = await opts.resultCache.get(cacheKey('process', params), async () => {
@@ -50,7 +50,7 @@ export const processRoutes: FastifyPluginAsync<ProcessRouteOptions> = async (app
 
     return sendImage(request, reply, value, {
       hit,
-      negotiated,
+      isAuto,
       httpMaxAgeSeconds: opts.httpMaxAgeSeconds,
     });
   });

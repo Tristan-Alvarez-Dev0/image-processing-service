@@ -42,7 +42,6 @@ export function useImage(request: PanelRequest | undefined): PanelState {
     return () => controller.abort();
   }, [id]);
 
-  // Free the previous blob once a new result has replaced it.
   useEffect(() => {
     const src = settled?.data?.src;
     return () => {

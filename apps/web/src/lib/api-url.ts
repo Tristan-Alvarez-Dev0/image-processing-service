@@ -1,7 +1,4 @@
-/**
- * Normalises the API base URL. Empty means "same origin", which is how the API
- * serves the UI locally; on Netlify the API lives on another domain.
- */
+/** Empty means the same origin, which is how the API serves the UI locally. */
 export function resolveApiUrl(raw: string | undefined): string {
   const value = (raw ?? '').trim().replace(/\/+$/, '');
   if (value === '') return '';
@@ -17,7 +14,6 @@ export function resolveApiUrl(raw: string | undefined): string {
   return value;
 }
 
-/** Response headers for the static site (Netlify `_headers` format). */
 export function staticSiteHeaders(apiUrl: string): string {
   const api = apiUrl ? ` ${new URL(apiUrl).origin}` : '';
   const csp = [

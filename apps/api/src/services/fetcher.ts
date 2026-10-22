@@ -14,7 +14,6 @@ export interface FetchedSource {
 }
 
 export interface FetchOptions {
-  /** Total budget for the whole fetch, including redirects and body download. */
   timeoutMs: number;
   maxBytes: number;
   maxRedirects: number;
@@ -64,7 +63,6 @@ function findCause<T>(err: unknown, pick: (e: unknown) => T | undefined): T | un
   return undefined;
 }
 
-/** How far a download got, so a timeout can say what happened. */
 interface Progress {
   received: number;
   expected: number | undefined;
@@ -89,10 +87,10 @@ function toAppError(
 
   if (timedOut) {
     if (progress.downloading) {
-      const of = progress.expected ? ` of ${formatBytes(progress.expected)}` : '';
+      const total = progress.expected ? ` of ${formatBytes(progress.expected)}` : '';
       return new AppError(
         'UPSTREAM_TIMEOUT',
-        `The source started sending but did not finish within ${timeoutMs / 1000}s (received ${formatBytes(progress.received)}${of}); it is too slow or too large`,
+        `The source started sending but did not finish within ${timeoutMs / 1000}s (received ${formatBytes(progress.received)}${total}); it is too slow or too large`,
       );
     }
     return new AppError(

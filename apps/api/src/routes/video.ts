@@ -33,12 +33,12 @@ export const videoRoutes: FastifyPluginAsync<VideoRouteOptions> = async (app, op
     { config: opts.rateLimit ? { rateLimit: opts.rateLimit } : {} },
     async (request, reply) => {
       const query = parseQuery(schema, request.query);
-      const negotiated = query.format === 'auto';
+      const isAuto = query.format === 'auto';
       const params = {
         ...query,
         url: new URL(query.url).href,
         format: query.format ?? 'jpeg',
-        accept: negotiated ? parseAccept(request.headers.accept) : undefined,
+        accept: isAuto ? parseAccept(request.headers.accept) : undefined,
       };
 
       const { value, hit } = await opts.resultCache.get(cacheKey('video', params), async () => {
@@ -63,7 +63,6 @@ export const videoRoutes: FastifyPluginAsync<VideoRouteOptions> = async (app, op
           }
           return {
             ...transformed,
-            // Report the video, not the intermediate PNG frame.
             original: {
               ...transformed.original,
               format: frame.container,
@@ -77,7 +76,7 @@ export const videoRoutes: FastifyPluginAsync<VideoRouteOptions> = async (app, op
 
       return sendImage(request, reply, value, {
         hit,
-        negotiated,
+        isAuto,
         httpMaxAgeSeconds: opts.httpMaxAgeSeconds,
       });
     },

@@ -7,7 +7,7 @@ import { curlCommand } from '@/lib/playground';
 
 interface Props {
   path: string | undefined;
-  negotiated: boolean;
+  isAuto: boolean;
 }
 
 function CopyButton({ text, label, icon }: { text: string; label: string; icon: React.ReactNode }) {
@@ -29,7 +29,7 @@ function CopyButton({ text, label, icon }: { text: string; label: string; icon: 
   );
 }
 
-export function RequestBar({ path, negotiated }: Props) {
+export function RequestBar({ path, isAuto }: Props) {
   if (!path) {
     return (
       <Card className="border-dashed">
@@ -55,17 +55,13 @@ export function RequestBar({ path, negotiated }: Props) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CopyButton text={url} label="Copy URL" icon={<Copy />} />
-          <CopyButton
-            text={curlCommand(url, negotiated)}
-            label="Copy as curl"
-            icon={<Terminal />}
-          />
+          <CopyButton text={curlCommand(url, isAuto)} label="Copy as curl" icon={<Terminal />} />
           <Button asChild variant="ghost" size="sm">
             <a href={url} target="_blank" rel="noreferrer">
               <ExternalLink /> Open
             </a>
           </Button>
-          {negotiated && (
+          {isAuto && (
             <span className="text-xs text-muted-foreground">
               format=auto depends on the Accept header, so the curl command sends one.
             </span>

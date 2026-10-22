@@ -24,7 +24,7 @@ interface Applied {
   run: number;
 }
 
-const sameForm = (a: FormState, b: FormState) =>
+const isSameForm = (a: FormState, b: FormState) =>
   (Object.keys(a) as Array<keyof FormState>).every((k) => a[k] === b[k]);
 
 export function App() {
@@ -44,23 +44,22 @@ export function App() {
   const original = useImage(request?.original);
   const processed = useImage(request?.processed);
   const running = original.loading || processed.loading;
-  const dirty = applied !== undefined && !sameForm(form, applied.form);
-  const results = useRef<HTMLDivElement>(null);
+  const dirty = applied !== undefined && !isSameForm(form, applied.form);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const run = () => {
     if (!form.url.trim()) return;
     setApplied((prev) => ({ form, run: (prev?.run ?? 0) + 1 }));
-    // On narrow screens the results are below the controls.
     if (window.matchMedia('(max-width: 1023px)').matches) {
-      results.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
   // A source problem fails both panels with the same error; show it once.
   const error = processed.error ?? original.error;
-  const described = error ? describeError(error) : undefined;
-  const empty = !request;
-  const video = request?.mode === 'video';
+  const errorInfo = error ? describeError(error) : undefined;
+  const isEmpty = !request;
+  const isVideo = request?.mode === 'video';
 
   const update = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }));
 
@@ -108,8 +107,8 @@ export function App() {
               onChange={update}
               onSample={(s) => update({ url: s.url, mode: s.mode })}
               onRun={run}
-              errorParam={dirty ? undefined : described?.param}
-              errorMessage={described?.message}
+              errorParam={dirty ? undefined : errorInfo?.param}
+              errorMessage={errorInfo?.message}
             />
           </CardContent>
           <CardFooter className="border-t">
@@ -124,25 +123,25 @@ export function App() {
         </Card>
 
         <div
-          ref={results}
+          ref={resultsRef}
           className="relative flex min-w-0 scroll-mt-6 flex-col gap-4 *:shrink-0 lg:min-h-0 lg:overflow-y-auto lg:pr-1"
         >
-          <RequestBar path={request?.processed.key} negotiated={request?.negotiated ?? false} />
+          <RequestBar path={request?.processed.key} isAuto={request?.isAuto ?? false} />
           <ErrorBanner error={error} />
           <div className="grid gap-4 md:grid-cols-2">
             <ImagePanel
               title="Original"
-              description={video ? 'The frame at the chosen time' : 'Your source, untouched'}
+              description={isVideo ? 'The frame at the chosen time' : 'Your source, untouched'}
               state={original}
               showSource
-              empty={empty}
+              empty={isEmpty}
             />
             <ImagePanel
               title="Processed"
               description="The API's response to the request above"
               state={processed}
               compareTo={original.data?.result.original.size}
-              empty={empty}
+              empty={isEmpty}
             />
           </div>
         </div>

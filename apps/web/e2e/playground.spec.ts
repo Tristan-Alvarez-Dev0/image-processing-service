@@ -229,7 +229,6 @@ for (const [width, height] of [
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThanOrEqual(height!);
 
-    // Cards in the results column must not be squashed to fit.
     await expect(page.getByRole('button', { name: 'Copy URL' })).toBeVisible();
     const card = (await page.getByTestId('request-url').boundingBox())!;
     expect(card.height).toBeGreaterThan(20);

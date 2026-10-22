@@ -37,7 +37,6 @@ interface Props {
   onChange: (patch: Partial<FormState>) => void;
   onSample: (sample: Sample) => void;
   onRun: () => void;
-  /** The parameter the API rejected, to highlight its field. */
   errorParam: string | undefined;
   errorMessage: string | undefined;
 }
@@ -60,7 +59,7 @@ const CROP_HELP: Record<string, string> = {
   scale: 'Stretches to the exact size.',
 };
 
-const LOSSLESS = new Set(['png', 'gif']);
+const LOSSLESS_FORMATS = new Set(['png', 'gif']);
 
 function Section({
   title,
@@ -147,19 +146,20 @@ function SampleButtons({
   );
 }
 
-const normaliseAngle = (deg: number) => {
+const normalizeAngle = (deg: number) => {
   const a = deg % 360;
   return a === 0 ? '' : String(a);
 };
 
 export function Controls({ form, onChange, onSample, onRun, errorParam, errorMessage }: Props) {
-  const video = form.mode === 'video';
-  const errorFor = (param: string) => (errorParam === param ? errorMessage : undefined);
-  const invalid = (param: string) => errorParam === param || undefined;
+  const isVideo = form.mode === 'video';
+  const fieldError = (param: string) => (errorParam === param ? errorMessage : undefined);
+  const isInvalid = (param: string) => errorParam === param || undefined;
 
-  const flips = form.flip === 'both' ? ['horizontal', 'vertical'] : form.flip ? [form.flip] : [];
+  const activeFlips =
+    form.flip === 'both' ? ['horizontal', 'vertical'] : form.flip ? [form.flip] : [];
   const rotateBy = (delta: number) =>
-    onChange({ rotate: normaliseAngle(Number(form.rotate || 0) + delta) });
+    onChange({ rotate: normalizeAngle(Number(form.rotate || 0) + delta) });
   const blur = form.blur === '' ? 0 : Number(form.blur);
 
   return (
@@ -189,9 +189,9 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
 
         <Field
           id="f-url"
-          label={video ? 'Video URL' : 'Image URL'}
+          label={isVideo ? 'Video URL' : 'Image URL'}
           param="url"
-          error={errorFor('url')}
+          error={fieldError('url')}
         >
           <div className="relative">
             <Link2 className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -200,10 +200,12 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
               type="url"
               inputMode="url"
               className="pl-8"
-              placeholder={video ? 'https://example.com/clip.mp4' : 'https://example.com/photo.jpg'}
+              placeholder={
+                isVideo ? 'https://example.com/clip.mp4' : 'https://example.com/photo.jpg'
+              }
               value={form.url}
               onChange={(e) => onChange({ url: e.target.value })}
-              aria-invalid={invalid('url')}
+              aria-invalid={isInvalid('url')}
               autoComplete="off"
               spellCheck={false}
             />
@@ -220,13 +222,13 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
           <SampleButtons samples={ERROR_SAMPLES} onSample={onSample} tone="error" />
         </div>
 
-        {video && (
+        {isVideo && (
           <Field
             id="f-time"
             label="Frame at"
             param="time"
             hint="Seconds from the start; decimals allowed."
-            error={errorFor('time')}
+            error={fieldError('time')}
           >
             <div className="relative">
               <Input
@@ -238,7 +240,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
                 placeholder="0"
                 value={form.time}
                 onChange={(e) => onChange({ time: e.target.value })}
-                aria-invalid={invalid('time')}
+                aria-invalid={isInvalid('time')}
               />
               <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
                 sec
@@ -258,7 +260,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
               id={`f-${dim}`}
               label={dim === 'width' ? 'Width' : 'Height'}
               param={dim}
-              error={errorFor(dim)}
+              error={fieldError(dim)}
             >
               <div className="relative">
                 <Input
@@ -269,7 +271,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
                   placeholder="auto"
                   value={form[dim]}
                   onChange={(e) => onChange({ [dim]: e.target.value })}
-                  aria-invalid={invalid(dim)}
+                  aria-invalid={isInvalid(dim)}
                 />
                 <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
                   px
@@ -284,7 +286,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
           label="Fit"
           param="crop"
           hint={CROP_HELP[form.crop]}
-          error={errorFor('crop')}
+          error={fieldError('crop')}
         >
           <ToggleGroup
             id="f-crop"
@@ -316,20 +318,20 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
           id="f-format"
           label="Format"
           param="format"
-          hint={video && !form.format ? 'Video frames default to JPEG.' : undefined}
-          error={errorFor('format')}
+          hint={isVideo && !form.format ? 'Video frames default to JPEG.' : undefined}
+          error={fieldError('format')}
         >
           <Select
             value={form.format || 'source'}
             onValueChange={(v) => onChange({ format: v === 'source' ? '' : (v as Format) })}
           >
-            <SelectTrigger id="f-format" className="w-full" aria-invalid={invalid('format')}>
+            <SelectTrigger id="f-format" className="w-full" aria-invalid={isInvalid('format')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {FORMATS.map((f) => (
                 <SelectItem key={f.value} value={f.value}>
-                  {f.value === 'source' && video ? 'Default (JPEG)' : f.label}
+                  {f.value === 'source' && isVideo ? 'Default (JPEG)' : f.label}
                   {f.hint && <span className="text-muted-foreground">· {f.hint}</span>}
                 </SelectItem>
               ))}
@@ -343,11 +345,11 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
           param="quality"
           aside={<span className="text-sm font-medium tabular-nums">{form.quality}</span>}
           hint={
-            LOSSLESS.has(form.format)
+            LOSSLESS_FORMATS.has(form.format)
               ? `${form.format.toUpperCase()} is lossless, so quality has no effect.`
               : 'Lower means smaller files.'
           }
-          error={errorFor('quality')}
+          error={fieldError('quality')}
         >
           <Slider
             id="f-quality"
@@ -364,7 +366,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
       <Separator />
 
       <Section title="Adjustments" icon={<SlidersHorizontal className="size-4" />}>
-        <Field id="f-rotate" label="Rotate" param="rotate" error={errorFor('rotate')}>
+        <Field id="f-rotate" label="Rotate" param="rotate" error={fieldError('rotate')}>
           <div className="flex gap-2">
             <Button
               type="button"
@@ -385,7 +387,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
                 placeholder="0"
                 value={form.rotate}
                 onChange={(e) => onChange({ rotate: e.target.value })}
-                aria-invalid={invalid('rotate')}
+                aria-invalid={isInvalid('rotate')}
               />
               <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
                 deg
@@ -403,14 +405,14 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
           </div>
         </Field>
 
-        <Field id="f-flip" label="Flip" param="flip" error={errorFor('flip')}>
+        <Field id="f-flip" label="Flip" param="flip" error={fieldError('flip')}>
           <ToggleGroup
             id="f-flip"
             type="multiple"
             variant="outline"
             size="sm"
             className="w-full"
-            value={flips}
+            value={activeFlips}
             onValueChange={(values) =>
               onChange({
                 flip:
@@ -443,7 +445,7 @@ export function Controls({ form, onChange, onSample, onRun, errorParam, errorMes
           aside={
             <span className="text-sm font-medium tabular-nums">{blur === 0 ? 'Off' : blur}</span>
           }
-          error={errorFor('blur')}
+          error={fieldError('blur')}
         >
           <Slider
             id="f-blur"

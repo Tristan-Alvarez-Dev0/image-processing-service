@@ -77,15 +77,14 @@ export interface PanelRequest {
 
 export interface PreparedRequest {
   mode: Mode;
-  /** The source, untransformed (for video: the frame at `time`). */
   original: PanelRequest;
   processed: PanelRequest;
-  negotiated: boolean;
+  isAuto: boolean;
 }
 
-const num = (value: string) => (value.trim() === '' ? undefined : Number(value));
+const toNumber = (value: string) => (value.trim() === '' ? undefined : Number(value));
 
-function panel(mode: Mode, options: Options, run: number): PanelRequest {
+function toPanelRequest(mode: Mode, options: Options, run: number): PanelRequest {
   return mode === 'video'
     ? {
         key: client.videoThumbnailUrl(options),
@@ -104,32 +103,32 @@ export function prepareRequest(form: FormState, run = 0): PreparedRequest | unde
   const url = form.url.trim();
   if (!url) return undefined;
 
-  const base: Options = form.mode === 'video' ? { url, time: num(form.time) } : { url };
+  const base: Options = form.mode === 'video' ? { url, time: toNumber(form.time) } : { url };
   const processed: Options = {
     ...base,
-    width: num(form.width),
-    height: num(form.height),
+    width: toNumber(form.width),
+    height: toNumber(form.height),
     format: form.format || undefined,
     quality: form.quality === DEFAULT_QUALITY ? undefined : form.quality,
     crop: form.crop === 'fill' ? undefined : form.crop,
-    rotate: num(form.rotate),
+    rotate: toNumber(form.rotate),
     flip: form.flip || undefined,
-    blur: num(form.blur),
+    blur: toNumber(form.blur),
     grayscale: form.grayscale || undefined,
   };
 
   return {
     mode: form.mode,
-    original: panel(form.mode, base, run),
-    processed: panel(form.mode, processed, run),
-    negotiated: form.format === 'auto',
+    original: toPanelRequest(form.mode, base, run),
+    processed: toPanelRequest(form.mode, processed, run),
+    isAuto: form.format === 'auto',
   };
 }
 
 const shellQuote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
 
-export function curlCommand(absoluteUrl: string, negotiated: boolean): string {
-  const accept = negotiated ? ` -H ${shellQuote('Accept: image/avif,image/webp,*/*')}` : '';
+export function curlCommand(absoluteUrl: string, isAuto: boolean): string {
+  const accept = isAuto ? ` -H ${shellQuote('Accept: image/avif,image/webp,*/*')}` : '';
   return `curl -sS -D -${accept} -o output ${shellQuote(absoluteUrl)}`;
 }
 
@@ -154,7 +153,7 @@ export interface DescribedError {
   requestId?: string | undefined;
 }
 
-const TITLES: Record<string, string> = {
+const ERROR_TITLES: Record<string, string> = {
   INVALID_PARAMETER: 'Invalid parameter',
   MISSING_PARAMETER: 'Missing parameter',
   INVALID_URL: 'Invalid URL',
@@ -174,7 +173,7 @@ const TITLES: Record<string, string> = {
 export function describeError(error: unknown): DescribedError {
   if (isImageApiError(error)) {
     return {
-      title: TITLES[error.code] ?? 'Request failed',
+      title: ERROR_TITLES[error.code] ?? 'Request failed',
       message: error.message,
       code: error.code,
       param: error.param,

@@ -22,7 +22,6 @@ import { LoadingCache } from './services/cache.js';
 import { createFetcher, type FetchedSource, type SourceFetcher } from './services/fetcher.js';
 import { ConcurrencyLimiter } from './services/limiter.js';
 
-/** Collaborators that tests can swap out. */
 export interface AppDeps {
   fetchSource?: SourceFetcher;
   logStream?: Writable;
@@ -30,7 +29,7 @@ export interface AppDeps {
 
 const isRateLimitedPath = (url: string) => url.startsWith('/process') || url.startsWith('/video/');
 
-const describeWindow = (ms: number) =>
+const formatWindow = (ms: number) =>
   ms % 60_000 === 0 ? `${ms / 60_000} minute${ms === 60_000 ? '' : 's'}` : `${ms / 1000} seconds`;
 
 function loggerOptions(config: Config, stream?: Writable): FastifyServerOptions['logger'] {
@@ -49,14 +48,26 @@ function loggerOptions(config: Config, stream?: Writable): FastifyServerOptions[
 }
 
 /** A hop count trusts the first N proxies, counting back from the connection. */
-const trustProxyOption = (trust: boolean | number) =>
+const toTrustProxy = (trust: boolean | number) =>
   typeof trust === 'number' ? (_address: string, hop: number) => hop < trust : trust;
 
-/** Builds the app without listening, so tests can use `app.inject()`. */
+function createSourceFetcher(app: FastifyInstance, config: Config): SourceFetcher {
+  const fetcher = createFetcher({
+    timeoutMs: config.FETCH_TIMEOUT_MS,
+    maxBytes: config.MAX_SOURCE_BYTES,
+    maxRedirects: config.MAX_REDIRECTS,
+    addresses: new AddressPolicy(config.ALLOW_PRIVATE_ADDRESSES),
+    allowedPorts: config.ALLOWED_PORTS,
+    userAgent: `ImageProcessingService/${config.APP_VERSION}`,
+  });
+  app.addHook('onClose', fetcher.close);
+  return fetcher.fetch;
+}
+
 export async function buildApp(config: Config, deps: AppDeps = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: loggerOptions(config, deps.logStream),
-    trustProxy: trustProxyOption(config.TRUST_PROXY),
+    trustProxy: toTrustProxy(config.TRUST_PROXY),
     genReqId: genRequestId,
     logController: new LogController({
       requestIdLogLabel: 'requestId',
@@ -86,29 +97,16 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
       errorResponseBuilder: (_request, ctx) =>
         new AppError(
           'RATE_LIMITED',
-          `Rate limit of ${ctx.max} requests per ${describeWindow(config.RATE_LIMIT_WINDOW_MS)} exceeded. Try again in ${ctx.after}.`,
+          `Rate limit of ${ctx.max} requests per ${formatWindow(config.RATE_LIMIT_WINDOW_MS)} exceeded. Try again in ${ctx.after}.`,
         ),
     });
   }
 
-  let baseFetch = deps.fetchSource;
-  if (!baseFetch) {
-    const fetcher = createFetcher({
-      timeoutMs: config.FETCH_TIMEOUT_MS,
-      maxBytes: config.MAX_SOURCE_BYTES,
-      maxRedirects: config.MAX_REDIRECTS,
-      addresses: new AddressPolicy(config.ALLOW_PRIVATE_ADDRESSES),
-      allowedPorts: config.ALLOWED_PORTS,
-      userAgent: `ImageProcessingService/${config.APP_VERSION}`,
-    });
-    app.addHook('onClose', fetcher.close);
-    baseFetch = fetcher.fetch;
-  }
-  const download = baseFetch;
-  const rawFetch: SourceFetcher = async (url, callOpts) => {
+  const httpFetch = deps.fetchSource ?? createSourceFetcher(app, config);
+  const timedFetch: SourceFetcher = async (url, callOpts) => {
     const end = metrics.upstreamDuration.startTimer();
     try {
-      const source = await download(url, callOpts);
+      const source = await httpFetch(url, callOpts);
       end({ outcome: 'ok' });
       return source;
     } catch (err) {
@@ -124,7 +122,7 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
     onLookup: (hit) => metrics.cacheLookups.inc({ cache: 'source', result: hit ? 'hit' : 'miss' }),
   });
   const fetchSource: SourceFetcher = async (url) =>
-    (await sourceCache.get(url, () => rawFetch(url))).value;
+    (await sourceCache.get(url, () => timedFetch(url))).value;
 
   const resultCache = new LoadingCache<ProcessedImage>({
     maxBytes: config.RESULT_CACHE_MAX_BYTES,
@@ -170,7 +168,7 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
     metrics,
   });
   await app.register(videoRoutes, {
-    fetchSource: rawFetch,
+    fetchSource: timedFetch,
     limiter,
     resultCache,
     maxDimension: config.MAX_OUTPUT_DIMENSION,
@@ -193,7 +191,6 @@ export async function buildApp(config: Config, deps: AppDeps = {}): Promise<Fast
   if (webBuildExists(config.WEB_ROOT)) {
     await app.register(webRoutes, { root: config.WEB_ROOT });
   } else {
-    // API-only deployment (the UI lives on Netlify): send visitors to the docs.
     app.get('/', { config: { rateLimit: false } }, (_request, reply) => reply.redirect('/docs'));
   }
 

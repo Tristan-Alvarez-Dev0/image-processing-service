@@ -18,7 +18,6 @@ export interface ExtractedFrame {
   durationSeconds: number | undefined;
 }
 
-/** Generous for one PNG frame, even from 8K video. */
 const MAX_FRAME_BYTES = 100 * 1024 * 1024;
 const STDERR_TAIL_BYTES = 16 * 1024;
 
@@ -32,9 +31,9 @@ export function detectVideoContainer(data: Buffer): VideoContainer | undefined {
 }
 
 export function parseDuration(log: string): number | undefined {
-  const m = /Duration: (\d+):(\d{2}):(\d{2}(?:\.\d+)?)/.exec(log);
-  if (!m) return undefined;
-  return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+  const match = /Duration: (\d+):(\d{2}):(\d{2}(?:\.\d+)?)/.exec(log);
+  if (!match) return undefined;
+  return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
 }
 
 interface FfmpegResult {
@@ -47,7 +46,7 @@ function runFfmpeg(path: string, args: string[], timeoutMs: number): Promise<Ffm
   return new Promise((resolve, reject) => {
     // No shell: arguments are passed as-is, so nothing in them can be interpreted.
     const child = spawn(path, args, { stdio: ['ignore', 'pipe', 'pipe'] });
-    const out: Buffer[] = [];
+    const chunks: Buffer[] = [];
     let outBytes = 0;
     let stderr = '';
     let timedOut = false;
@@ -60,7 +59,7 @@ function runFfmpeg(path: string, args: string[], timeoutMs: number): Promise<Ffm
     child.stdout.on('data', (chunk: Buffer) => {
       outBytes += chunk.length;
       if (outBytes > MAX_FRAME_BYTES) child.kill('SIGKILL');
-      else out.push(chunk);
+      else chunks.push(chunk);
     });
     child.stderr.on('data', (chunk: Buffer) => {
       stderr = (stderr + chunk.toString('utf8')).slice(-STDERR_TAIL_BYTES);
@@ -71,7 +70,7 @@ function runFfmpeg(path: string, args: string[], timeoutMs: number): Promise<Ffm
     });
     child.on('close', () => {
       clearTimeout(timer);
-      resolve({ stdout: Buffer.concat(out), stderr, timedOut });
+      resolve({ stdout: Buffer.concat(chunks), stderr, timedOut });
     });
   });
 }

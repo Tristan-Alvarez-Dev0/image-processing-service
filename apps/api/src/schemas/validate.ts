@@ -1,7 +1,6 @@
 import type { z } from 'zod';
 import { AppError, type ErrorDetail } from '../errors/app-error.js';
 
-/** Validates a query and throws an AppError listing every problem. */
 export function parseQuery<S extends z.ZodObject>(schema: S, query: unknown): z.infer<S> {
   const raw = (query ?? {}) as Record<string, unknown>;
 

@@ -7,7 +7,6 @@ import ipaddr from 'ipaddr.js';
 export class AddressPolicy {
   private readonly exceptions: Set<string>;
 
-  /** @param exceptions private addresses to allow anyway (dev/test only) */
   constructor(exceptions: readonly string[] = []) {
     this.exceptions = new Set(exceptions.map((ip) => normalize(ip) ?? ip));
   }
@@ -20,7 +19,6 @@ export class AddressPolicy {
   }
 }
 
-/** Canonical string form; IPv4-mapped IPv6 (::ffff:a.b.c.d) becomes plain IPv4. */
 function normalize(ip: string): string | undefined {
   const bare = ip.replace(/^\[|\]$/g, '');
   if (!ipaddr.isValid(bare)) return undefined;

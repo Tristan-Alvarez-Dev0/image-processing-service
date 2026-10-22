@@ -10,7 +10,6 @@ interface Props {
   title: string;
   description: string;
   state: PanelState;
-  /** Show the source's details (X-Original-* headers) instead of the output's. */
   showSource?: boolean;
   compareTo?: number | undefined;
   empty: boolean;
@@ -29,11 +28,12 @@ export function ImagePanel({ title, description, state, showSource, compareTo, e
   const result = state.data?.result;
   const error = state.error ? describeError(state.error) : undefined;
   const titleId = `${title.toLowerCase()}-title`;
-  const show = result && !error && !empty;
-  const change = show && compareTo !== undefined ? sizeChange(result.size, compareTo) : undefined;
+  const hasResult = result && !error && !empty;
+  const change =
+    hasResult && compareTo !== undefined ? sizeChange(result.size, compareTo) : undefined;
 
   const badge =
-    show && !showSource ? (
+    hasResult && !showSource ? (
       <Badge
         variant="outline"
         className={
@@ -89,7 +89,7 @@ export function ImagePanel({ title, description, state, showSource, compareTo, e
           )}
         </div>
 
-        {show && (
+        {hasResult && (
           <dl className="grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] gap-2">
             {showSource ? (
               <>
@@ -114,7 +114,7 @@ export function ImagePanel({ title, description, state, showSource, compareTo, e
           </dl>
         )}
 
-        {show && !showSource && (
+        {hasResult && !showSource && (
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             {change && (
               <span

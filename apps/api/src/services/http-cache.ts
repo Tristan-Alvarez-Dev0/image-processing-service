@@ -13,7 +13,6 @@ export function ifNoneMatchHits(header: string | undefined, etag: string): boole
   return header.split(',').some((tag) => strip(tag) === ours);
 }
 
-/** Built from validated params, so aliases, defaults and order don't create extra entries. */
 export function cacheKey(namespace: string, params: Record<string, unknown>): string {
   const sorted = Object.keys(params)
     .sort()

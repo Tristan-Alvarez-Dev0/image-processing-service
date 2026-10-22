@@ -1,4 +1,3 @@
-/** Public, stable error codes and their HTTP statuses. */
 export const ERROR_CODES = {
   INVALID_PARAMETER: 400,
   MISSING_PARAMETER: 400,
@@ -24,7 +23,6 @@ export interface ErrorDetail {
   message: string;
 }
 
-/** An expected, client-facing error. The HTTP status is derived from the code. */
 export class AppError extends Error {
   readonly statusCode: number;
 
@@ -32,7 +30,6 @@ export class AppError extends Error {
     public readonly code: ErrorCode,
     message: string,
     public readonly param?: string,
-    /** Every problem found, when more than one (e.g. several invalid params). */
     public readonly details?: ErrorDetail[],
   ) {
     super(message);

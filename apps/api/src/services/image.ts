@@ -10,12 +10,10 @@ export interface TransformOptions {
   format?: RequestedFormat | undefined;
   quality: number;
   crop: CropMode;
-  /** Degrees clockwise, 0-359. Applied before resizing. */
   rotate?: number | undefined;
   flip?: FlipMode | undefined;
   blur?: number | undefined;
   grayscale?: boolean | undefined;
-  /** What the client accepts; only used for format=auto. */
   accept?: AcceptedFormats | undefined;
 }
 
@@ -45,7 +43,6 @@ const ANIMATED_FORMATS: ReadonlySet<OutputFormat> = new Set(['gif', 'webp']);
 const isOutputFormat = (f: string | undefined): f is OutputFormat =>
   (OUTPUT_FORMATS as readonly string[]).includes(f ?? '');
 
-/** Explicit format wins; `auto` negotiates; otherwise keep the source format, or PNG. */
 function resolveFormat(opts: TransformOptions, meta: Metadata, frames: number): OutputFormat {
   const requested = opts.format;
   if (requested === 'auto') {
@@ -119,7 +116,6 @@ export const SUPPORTED_INPUT_FORMATS: ReadonlySet<string> = new Set([
 ]);
 
 export interface ImageLimits {
-  /** Max decoded pixels across all frames (decompression-bomb guard). */
   maxInputPixels: number;
   timeoutMs: number;
 }
@@ -167,10 +163,10 @@ export async function transformImage(
   // Checked from the header, before decoding a single pixel.
   const inputPixels = srcW * srcH * frames;
   if (inputPixels > limits.maxInputPixels) {
-    const across = frames > 1 ? ` across ${frames} frames` : '';
+    const framesNote = frames > 1 ? ` across ${frames} frames` : '';
     throw new AppError(
       'SOURCE_TOO_LARGE',
-      `The source image is ${srcW}x${srcH}${across} (${megapixels(inputPixels)}); the limit is ${megapixels(limits.maxInputPixels)}`,
+      `The source image is ${srcW}x${srcH}${framesNote} (${megapixels(inputPixels)}); the limit is ${megapixels(limits.maxInputPixels)}`,
     );
   }
 
@@ -197,10 +193,10 @@ export async function transformImage(
   const [rotW, rotH] = rotatedSize(srcW, srcH, opts.rotate ?? 0);
   const outputPixels = estimateOutputPixels(rotW, rotH, opts) * (animated ? frames : 1);
   if (outputPixels > limits.maxInputPixels) {
-    const across = animated ? ` across ${frames} frames` : '';
+    const framesNote = animated ? ` across ${frames} frames` : '';
     throw new AppError(
       'INVALID_PARAMETER',
-      `The output would be about ${megapixels(outputPixels)}${across}; the limit is ${megapixels(limits.maxInputPixels)}. Request a smaller width or height`,
+      `The output would be about ${megapixels(outputPixels)}${framesNote}; the limit is ${megapixels(limits.maxInputPixels)}. Request a smaller width or height`,
       opts.width ? 'width' : 'height',
     );
   }
@@ -228,7 +224,6 @@ export async function transformImage(
   }
 
   if (opts.blur) pipeline = pipeline.blur(opts.blur);
-  // Single channel: about half the size for PNG.
   if (opts.grayscale) pipeline = pipeline.greyscale().toColourspace('b-w');
   if (format === 'jpeg') pipeline = pipeline.flatten({ background: '#ffffff' });
 

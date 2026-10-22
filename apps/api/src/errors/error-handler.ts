@@ -26,7 +26,6 @@ function send(reply: FastifyReply, request: FastifyRequest, err: AppError) {
   return reply.status(err.statusCode).header('Cache-Control', 'no-store').send(body);
 }
 
-/** Maps errors Fastify raises itself (bad URL encoding, etc.) onto our codes. */
 function fromFastifyError(err: FastifyError): AppError | undefined {
   const status = err.statusCode ?? 500;
   if (status >= 500) return undefined;

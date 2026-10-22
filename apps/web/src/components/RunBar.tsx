@@ -11,7 +11,6 @@ interface Props {
   onReset: () => void;
 }
 
-/** Nothing calls the API until this is pressed. */
 export function RunBar({ mode, disabled, running, dirty, onReset }: Props) {
   const label = mode === 'video' ? 'Get thumbnail' : 'Process image';
 

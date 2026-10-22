@@ -91,34 +91,34 @@ export class ImageClient {
 
   private async fetchImage(
     url: string,
-    negotiated: boolean,
+    isAuto: boolean,
     request: RequestOptions,
   ): Promise<ImageResult> {
-    const headers: Record<string, string> = negotiated
+    const headers: Record<string, string> = isAuto
       ? { accept: request.accept ?? DEFAULT_ACCEPT }
       : {};
     const res = await this.send(url, headers, request.signal);
     const blob = await res.blob();
-    const h = res.headers;
-    const duration = h.get('x-original-duration');
+    const responseHeaders = res.headers;
+    const duration = responseHeaders.get('x-original-duration');
     const original: SourceInfo = {
-      width: intHeader(h, 'x-original-width') ?? 0,
-      height: intHeader(h, 'x-original-height') ?? 0,
-      format: h.get('x-original-format') ?? 'unknown',
-      size: intHeader(h, 'x-original-size') ?? 0,
+      width: intHeader(responseHeaders, 'x-original-width') ?? 0,
+      height: intHeader(responseHeaders, 'x-original-height') ?? 0,
+      format: responseHeaders.get('x-original-format') ?? 'unknown',
+      size: intHeader(responseHeaders, 'x-original-size') ?? 0,
       ...(duration !== null && { duration: Number(duration) }),
     };
-    const cache = h.get('x-cache');
+    const cache = responseHeaders.get('x-cache');
     return {
       blob,
-      contentType: h.get('content-type') ?? blob.type,
-      width: intHeader(h, 'x-output-width') ?? 0,
-      height: intHeader(h, 'x-output-height') ?? 0,
+      contentType: responseHeaders.get('content-type') ?? blob.type,
+      width: intHeader(responseHeaders, 'x-output-width') ?? 0,
+      height: intHeader(responseHeaders, 'x-output-height') ?? 0,
       size: blob.size,
       original,
       cache: cache === 'HIT' || cache === 'MISS' ? cache : undefined,
-      etag: h.get('etag') ?? undefined,
-      requestId: h.get('x-request-id') ?? undefined,
+      etag: responseHeaders.get('etag') ?? undefined,
+      requestId: responseHeaders.get('x-request-id') ?? undefined,
       url,
     };
   }

@@ -24,39 +24,38 @@ const forbidden = (message: string) => new AppError('FORBIDDEN_HOST', message);
 
 /** Checks what can be checked without DNS. Runs again on every redirect hop (`hop` > 0). */
 export function assertFetchableUrl(url: URL, policy: TargetPolicyOptions, hop = 0): void {
-  const via = hop > 0 ? 'The source URL redirected to a URL that' : 'The url';
+  const subject = hop > 0 ? 'The source URL redirected to a URL that' : 'The url';
 
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw hop > 0
-      ? new AppError('UPSTREAM_ERROR', `${via} is not http(s) (${url.protocol})`)
+      ? new AppError('UPSTREAM_ERROR', `${subject} is not http(s) (${url.protocol})`)
       : new AppError('INVALID_URL', 'url must be an absolute http:// or https:// URL', 'url');
   }
 
   if (url.username || url.password) {
     throw hop > 0
-      ? new AppError('UPSTREAM_ERROR', `${via} contains credentials, which is not allowed`)
+      ? new AppError('UPSTREAM_ERROR', `${subject} contains credentials, which is not allowed`)
       : new AppError('INVALID_URL', 'url must not contain credentials (user:pass@)', 'url');
   }
 
   const port = url.port ? Number(url.port) : DEFAULT_PORTS[url.protocol]!;
   if (policy.allowedPorts !== '*' && !policy.allowedPorts.has(port)) {
     const allowed = [...policy.allowedPorts].join(', ');
-    throw forbidden(`${via} uses port ${port}; only ports ${allowed} are allowed`);
+    throw forbidden(`${subject} uses port ${port}; only ports ${allowed} are allowed`);
   }
 
   // Trailing dots ("localhost.") are valid DNS and must not slip past checks.
   const hostname = url.hostname.replace(/\.+$/, '').toLowerCase();
   if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
-    throw forbidden(`${via} points to localhost, which is not allowed`);
+    throw forbidden(`${subject} points to localhost, which is not allowed`);
   }
 
   // IP literals never go through DNS, so they must be checked here.
   if (isIpLiteral(hostname) && !policy.addresses.isAllowed(hostname)) {
-    throw forbidden(`${via} points to a private or reserved IP address, which is not allowed`);
+    throw forbidden(`${subject} points to a private or reserved IP address, which is not allowed`);
   }
 }
 
-/** Injectable for tests. */
 export type Resolver = (
   hostname: string,
   family: number,

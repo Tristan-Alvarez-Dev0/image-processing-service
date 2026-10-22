@@ -52,7 +52,6 @@ const configSchema = z
         return z.NEVER;
       }),
 
-    /** Total time budget for fetching the source, across all redirects. */
     FETCH_TIMEOUT_MS: positiveInt.default(10_000),
     MAX_SOURCE_BYTES: positiveInt.default(15 * MB),
     MAX_REDIRECTS: z.coerce.number().int().min(0).max(10).default(3),
@@ -110,7 +109,6 @@ const configSchema = z
 
 export type Config = z.infer<typeof configSchema>;
 
-/** Parses env vars, failing fast with every invalid variable listed. */
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const result = configSchema.safeParse(env);
   if (!result.success) {

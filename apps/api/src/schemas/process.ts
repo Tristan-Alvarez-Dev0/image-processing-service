@@ -6,18 +6,9 @@ export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
 export const REQUESTED_FORMATS = [...OUTPUT_FORMATS, 'auto'] as const;
 export type RequestedFormat = (typeof REQUESTED_FORMATS)[number];
 
-/** Mirror the image: horizontal swaps left/right, vertical swaps top/bottom. */
 export const FLIP_MODES = ['horizontal', 'vertical', 'both'] as const;
 export type FlipMode = (typeof FLIP_MODES)[number];
 
-/**
- * How the image is fitted into the requested width x height box.
- * - fill:  cover the box exactly, cropping the overflow (default)
- * - fit:   fit inside the box, keeping aspect ratio (may be smaller on one side)
- * - limit: like fit, but never upscale beyond the source size
- * - pad:   fit inside the box, then pad to the exact size
- * - scale: stretch to the exact size, ignoring aspect ratio
- */
 export const CROP_MODES = ['fill', 'fit', 'limit', 'pad', 'scale'] as const;
 export type CropMode = (typeof CROP_MODES)[number];
 
@@ -39,7 +30,6 @@ const integer = (name: string, min: number, max?: number) => {
     );
 };
 
-/** Rotation in degrees; negatives are counter-clockwise. Normalised to 0-359. */
 const angle = (name: string) => {
   const message = `${name} must be a whole number of degrees from -360 to 360`;
   return z
@@ -50,7 +40,6 @@ const angle = (name: string) => {
     .transform((deg) => ((deg % 360) + 360) % 360);
 };
 
-/** A plain decimal such as "2" or "2.5" (no exponents or hex). */
 const decimal = (name: string, min: number, max: number, unit?: string) => {
   const message = `${name} must be a number${unit ? ` of ${unit}` : ''} from ${min} to ${max}`;
   return z
@@ -70,7 +59,6 @@ const oneOf = <T extends readonly [string, ...string[]]>(name: string, values: T
     error: `${name} must be one of: ${[...values, extra].filter(Boolean).join(', ')}`,
   });
 
-/** Long enough for real CDN URLs with signed query strings; stops abuse via giant URLs. */
 export const MAX_URL_LENGTH = 2048;
 
 export interface ProcessLimits {

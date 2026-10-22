@@ -1,6 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
-/** Headers browsers on other origins may read (CORS). */
 export const EXPOSED_HEADERS = [
   'Content-Length',
   'ETag',
@@ -30,7 +29,7 @@ export interface ImageResponseOptions {
   hit: boolean;
   httpMaxAgeSeconds: number;
   /** True for format=auto: the bytes depend on the Accept header. */
-  negotiated: boolean;
+  isAuto: boolean;
 }
 
 export function sendImage(
@@ -39,7 +38,7 @@ export function sendImage(
   result: ProcessedImage,
   opts: ImageResponseOptions,
 ) {
-  if (opts.negotiated) reply.header('Vary', 'Accept');
+  if (opts.isAuto) reply.header('Vary', 'Accept');
   reply
     .header('Cache-Control', `public, max-age=${opts.httpMaxAgeSeconds}`)
     .header('ETag', result.etag)

@@ -16,7 +16,6 @@ export function parseAccept(header: string | undefined): AcceptedFormats {
   return { avif: accepted.has('image/avif'), webp: accepted.has('image/webp') };
 }
 
-/** AVIF > WebP > PNG (with alpha) or JPEG. Animations need WebP or GIF. */
 export function chooseAutoFormat(
   accepts: AcceptedFormats,
   source: { hasAlpha: boolean; animated: boolean },
